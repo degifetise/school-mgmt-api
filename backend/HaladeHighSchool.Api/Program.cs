@@ -43,8 +43,11 @@ builder.Services
 var jwtSettings = builder.Configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>()
     ?? throw new InvalidOperationException("The 'Jwt' configuration section is missing.");
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is missing.");
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException("Connection string 'DefaultConnection' is missing.");
+}
 
 // ---------------------------------------------------------------------------
 // Database
@@ -196,7 +199,14 @@ builder.Services
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
 
-builder.Services.AddAutoMapper(typeof(Program).Assembly);
+builder.Services.AddAutoMapper(configuration =>
+{
+    var licenseKey = builder.Configuration["AutoMapper:LicenseKey"];
+    if (!string.IsNullOrWhiteSpace(licenseKey))
+    {
+        configuration.LicenseKey = licenseKey;
+    }
+}, typeof(Program).Assembly);
 builder.Services.AddValidatorsFromAssemblyContaining<HaladeHighSchool.Api.Validation.CreateEventDtoValidator>();
 
 builder.Services.AddProblemDetails();
@@ -343,11 +353,6 @@ try
 }
 catch (Exception ex)
 {
-    Console.WriteLine($"[STARTUP CRASH ERROR]: {ex.Message}");
-    if (ex.InnerException is not null)
-    {
-        Console.WriteLine($"[INNER EXCEPTION]: {ex.InnerException.Message}");
-    }
-
+    app.Logger.LogCritical(ex, "The API failed during startup.");
     throw;
 }

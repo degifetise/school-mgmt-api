@@ -6,9 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HaladeHighSchool.Api.Data;
 
-/* Seed account values are read from configuration. Keep passwords and signing keys
-   in .NET user-secrets or environment variables, never in appsettings files.
-   See README_CREDENTIALS.md for local setup instructions. */
+
 
 /// <summary>
 /// Creates the artefacts the Phase 1 T-SQL script cannot: Identity password hashes must be
