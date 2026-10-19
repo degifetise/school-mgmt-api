@@ -22,7 +22,13 @@ file. The checked-in connection string uses Windows integrated authentication.
 
 The project uses a `UserSecretsId` so the commands work without putting credentials
 in the project file. The administrator seeder does nothing until both admin email and
-password are configured. `Jwt:Key` is required when the API starts.
+password are configured. The application binds JWT settings from the `Jwt` section
+(`Key`, `Issuer`, `Audience`, and `AccessTokenMinutes`); `Jwt:Key` is required when the
+API starts. .NET loads user-secrets only in the `Development` environment. For a local
+run, use the project's Development launch profile or set
+`$env:ASPNETCORE_ENVIRONMENT = "Development"` before `dotnet run`. For non-development
+environments, provide the key through the `Jwt__Key` environment variable or a secret
+provider instead of checking it into JSON.
 
 ## Optional development accounts
 

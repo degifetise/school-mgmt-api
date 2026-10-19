@@ -278,6 +278,8 @@ export default function TopNavBar() {
           ))}
         </nav>
 
+
+
         <div className="ml-auto flex items-center gap-2">
           {isAuthenticated && unreadCount > 0 && (
             <div className="relative" ref={notificationRef}>
@@ -353,6 +355,7 @@ export default function TopNavBar() {
               </AnimatePresence>
             </div>
           )}
+
           {isAuthenticated ? (
             <>
               {/* Separator: everything to the right of it is about the account, not the site. */}

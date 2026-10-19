@@ -74,9 +74,25 @@ public class HealthController : PortalControllerBase
             var integrity = await CheckIntegrityAsync(cancellationToken);
             var academicYear = await _settings.GetAcademicYearAsync(cancellationToken);
 
+            if (!integrity.SchemaReachable || !integrity.ReportCardViewAvailable)
+            {
+                return ServiceUnavailable(new DbHealthResponse
+                {
+                    Status = "Unhealthy",
+                    CanConnect = true,
+                    Database = connection.Database,
+                    ConnectionState = connection.State.ToString(),
+                    AcademicYear = academicYear,
+                    LatencyMs = stopwatch.ElapsedMilliseconds,
+                    CheckedAtUtc = DateTime.UtcNow,
+                    Integrity = integrity,
+                    Error = "Required database objects are unavailable."
+                });
+            }
+
             var response = new DbHealthResponse
             {
-                Status = integrity.SchemaReachable && integrity.GradingPolicyValid ? "Healthy" : "Degraded",
+                Status = integrity.GradingPolicyValid ? "Healthy" : "Degraded",
                 CanConnect = true,
                 Database = connection.Database,
                 ConnectionState = connection.State.ToString(),

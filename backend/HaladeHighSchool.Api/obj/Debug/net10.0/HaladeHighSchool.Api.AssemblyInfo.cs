@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("HaladeHighSchool.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+dc0d6c2f8162f2928da942b1df8b24d3ec3e6b4a")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0c899d124f643c4c323917dfd509a08f56f7b527")]
 [assembly: System.Reflection.AssemblyProductAttribute("HaladeHighSchool.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("HaladeHighSchool.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
