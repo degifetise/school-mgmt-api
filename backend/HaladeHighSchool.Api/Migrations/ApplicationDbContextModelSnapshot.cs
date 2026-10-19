@@ -22,6 +22,8 @@ namespace HaladeHighSchool.Api.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.HasSequence("SmartCardSerialSequence");
+
             modelBuilder.Entity("HaladeHighSchool.Api.Models.Announcement", b =>
                 {
                     b.Property<int>("Id")

@@ -18,11 +18,20 @@ public sealed class SmartIDCardService
         _tokenKeyProtector = tokenKeyProtector;
     }
 
-    public async Task AddCardAsync(
+    public async Task<SmartCard> AddCardAsync(
         ApplicationUser user,
         string cardType,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentException.ThrowIfNullOrWhiteSpace(user.Id);
+        ArgumentException.ThrowIfNullOrWhiteSpace(cardType);
+
+        if (cardType is not ("STUDENT" or "TEACHER" or "STAFF"))
+        {
+            throw new ArgumentException("The Smart ID card type is not supported.", nameof(cardType));
+        }
+
         await _db.Database.OpenConnectionAsync(cancellationToken);
         string cardUid;
         try
@@ -31,8 +40,14 @@ public sealed class SmartIDCardService
             command.CommandText =
                 "SELECT 'SID-' || EXTRACT(YEAR FROM CURRENT_TIMESTAMP)::int::text || '-' || " +
                 "LPAD(nextval('\"SmartCardSerialSequence\"')::text, 8, '0');";
-            cardUid = (string?)await command.ExecuteScalarAsync(cancellationToken)
+            var result = await command.ExecuteScalarAsync(cancellationToken);
+            cardUid = result as string
                 ?? throw new InvalidOperationException("The Smart ID serial sequence did not return a card UID.");
+
+            if (string.IsNullOrWhiteSpace(cardUid))
+            {
+                throw new InvalidOperationException("The Smart ID serial sequence returned an empty card UID.");
+            }
         }
         finally
         {
@@ -40,10 +55,22 @@ public sealed class SmartIDCardService
         }
 
         var tokenKey = RandomNumberGenerator.GetBytes(32);
-        var protectedKey = _tokenKeyProtector.Protect(tokenKey);
-        CryptographicOperations.ZeroMemory(tokenKey);
+        string protectedKey;
+        try
+        {
+            protectedKey = _tokenKeyProtector.Protect(tokenKey);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(tokenKey);
+        }
 
-        _db.SmartCards.Add(new SmartCard
+        if (string.IsNullOrWhiteSpace(protectedKey))
+        {
+            throw new InvalidOperationException("The Smart ID token key could not be protected.");
+        }
+
+        var card = new SmartCard
         {
             UserId = user.Id,
             CardUID = cardUid,
@@ -53,7 +80,9 @@ public sealed class SmartIDCardService
             IssuedDate = DateTime.UtcNow,
             ExpirationDate = DateTime.UtcNow.AddYears(5),
             CreatedAt = DateTime.UtcNow
-        });
+        };
+        _db.SmartCards.Add(card);
+        return card;
     }
 
 }

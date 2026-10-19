@@ -26,16 +26,13 @@ public sealed class AnalyticsController(IAnalyticsService analytics) : PortalCon
     [HttpGet("teacher/analytics/performance")]
     [Authorize(Roles = "Teacher")]
     [ProducesResponseType<TeacherAnalyticsPerformanceResponse>(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<TeacherAnalyticsPerformanceResponse>> GetTeacherPerformance(
         CancellationToken cancellationToken)
     {
         var performance = await analytics.GetTeacherPerformanceAsync(
-            User.GetUserId(),
+            User.GetTeacherId(),
             cancellationToken);
 
-        return performance is null
-            ? NotFoundProblem("The signed-in account is not linked to an active teacher profile.")
-            : Ok(performance);
+        return Ok(performance);
     }
 }

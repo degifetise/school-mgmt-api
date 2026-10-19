@@ -49,6 +49,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
     {
         base.OnModelCreating(builder);
 
+        builder.HasSequence<long>("SmartCardSerialSequence");
+
         ConfigureIdentity(builder);
         ConfigureAcademicStructure(builder);
         ConfigurePeople(builder);
