@@ -5,8 +5,8 @@ using HaladeHighSchool.Api.Models;
 using HaladeHighSchool.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace HaladeHighSchool.Api.Controllers;
 
@@ -153,7 +153,10 @@ public class AdminGuardiansController : PortalControllerBase
         {
             await _db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException ex) when (ex.GetBaseException() is SqlException { Number: 2601 or 2627 })
+        catch (DbUpdateException ex) when (ex.GetBaseException() is PostgresException
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation
+        })
         {
             return Conflict(new ProblemDetails
             {

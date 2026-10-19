@@ -3,8 +3,9 @@ using HaladeHighSchool.Api.DTOs;
 using HaladeHighSchool.Api.Models;
 using HaladeHighSchool.Api.Configuration;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.Data.SqlClient;
+using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using System.Data;
 
 namespace HaladeHighSchool.Api.Services;
@@ -205,7 +206,10 @@ public class RegistrationRequestService : IRegistrationRequestService
         {
             await _db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException ex) when (ex.GetBaseException() is SqlException { Number: 2601 or 2627 })
+        catch (DbUpdateException ex) when (ex.GetBaseException() is PostgresException
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation
+        })
         {
             await _photoStorage.DeleteAsync(photoUrl);
             // The filtered unique index is the real guard; two simultaneous submissions land here.
@@ -574,22 +578,26 @@ public class RegistrationRequestService : IRegistrationRequestService
 
         try
         {
-            await using var command = _db.Database.GetDbConnection().CreateCommand();
-            command.CommandText =
-                "DECLARE @lockResult int; " +
-                "EXEC @lockResult = sys.sp_getapplock " +
-                "@Resource = @resource, @LockMode = N'Exclusive', " +
-                "@LockOwner = N'Session', @LockTimeout = 10000; " +
-                "SELECT @lockResult;";
-            var resource = command.CreateParameter();
-            resource.ParameterName = "@resource";
-            resource.DbType = DbType.String;
-            resource.Size = 255;
-            resource.Value = $"StudentRegistrationApproval:{requestId}";
-            command.Parameters.Add(resource);
+            var resourceName = $"StudentRegistrationApproval:{requestId}";
+            var timeout = Stopwatch.StartNew();
+            while (!lockAcquired && timeout.Elapsed < TimeSpan.FromSeconds(10))
+            {
+                await using var command = _db.Database.GetDbConnection().CreateCommand();
+                command.CommandText = "SELECT pg_try_advisory_lock(hashtextextended(@resource, 0));";
+                var resource = command.CreateParameter();
+                resource.ParameterName = "@resource";
+                resource.DbType = DbType.String;
+                resource.Value = resourceName;
+                command.Parameters.Add(resource);
 
-            var lockResult = Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken));
-            if (lockResult < 0)
+                lockAcquired = Convert.ToBoolean(await command.ExecuteScalarAsync(cancellationToken));
+                if (!lockAcquired)
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
+                }
+            }
+
+            if (!lockAcquired)
             {
                 return RegistrationResult<T>.Fail(
                     RegistrationFailure.Conflict,
@@ -597,7 +605,6 @@ public class RegistrationRequestService : IRegistrationRequestService
                     "This application is currently being reviewed. Refresh the queue and try again.");
             }
 
-            lockAcquired = true;
             return await action(cancellationToken);
         }
         finally
@@ -607,15 +614,13 @@ public class RegistrationRequestService : IRegistrationRequestService
                 try
                 {
                     await using var release = _db.Database.GetDbConnection().CreateCommand();
-                    release.CommandText =
-                        "EXEC sys.sp_releaseapplock @Resource = @resource, @LockOwner = N'Session';";
+                    release.CommandText = "SELECT pg_advisory_unlock(hashtextextended(@resource, 0));";
                     var resource = release.CreateParameter();
                     resource.ParameterName = "@resource";
                     resource.DbType = DbType.String;
-                    resource.Size = 255;
                     resource.Value = $"StudentRegistrationApproval:{requestId}";
                     release.Parameters.Add(resource);
-                    await release.ExecuteNonQueryAsync(CancellationToken.None);
+                    await release.ExecuteScalarAsync(CancellationToken.None);
                 }
                 catch (Exception ex)
                 {
