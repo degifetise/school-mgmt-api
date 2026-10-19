@@ -673,6 +673,21 @@ namespace HaladeHighSchool.Api.Migrations
                     b.ToTable("GradeLevels", (string)null);
                 });
 
+            modelBuilder.Entity("HaladeHighSchool.Api.Models.GradeLevelSection", b =>
+                {
+                    b.Property<int>("GradeLevelId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SectionId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("GradeLevelId", "SectionId");
+
+                    b.HasIndex("SectionId");
+
+                    b.ToTable("GradeLevelSections", (string)null);
+                });
+
             modelBuilder.Entity("HaladeHighSchool.Api.Models.Guardian", b =>
                 {
                     b.Property<int>("Id")
@@ -1216,8 +1231,6 @@ namespace HaladeHighSchool.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("GradeLevelId");
-
                     b.HasIndex("SectionId");
 
                     b.HasIndex("StudentIdNumber")
@@ -1228,6 +1241,8 @@ namespace HaladeHighSchool.Api.Migrations
                         .IsUnique()
                         .HasDatabaseName("UQ_Students_UserId")
                         .HasFilter("\"UserId\" IS NOT NULL");
+
+                    b.HasIndex("GradeLevelId", "SectionId");
 
                     b.ToTable("Students", (string)null);
                 });
@@ -1390,9 +1405,9 @@ namespace HaladeHighSchool.Api.Migrations
 
                     b.HasIndex("CreatedStudentId");
 
-                    b.HasIndex("GradeLevelId");
-
                     b.HasIndex("SectionId");
+
+                    b.HasIndex("GradeLevelId", "SectionId");
 
                     b.HasIndex("Status", "SubmittedAt")
                         .HasDatabaseName("IX_StudentRegistrationRequests_Status_SubmittedAt");
@@ -1909,6 +1924,25 @@ namespace HaladeHighSchool.Api.Migrations
                     b.Navigation("Invoice");
                 });
 
+            modelBuilder.Entity("HaladeHighSchool.Api.Models.GradeLevelSection", b =>
+                {
+                    b.HasOne("HaladeHighSchool.Api.Models.GradeLevel", "GradeLevel")
+                        .WithMany("SectionLinks")
+                        .HasForeignKey("GradeLevelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HaladeHighSchool.Api.Models.Section", "Section")
+                        .WithMany("GradeLevelLinks")
+                        .HasForeignKey("SectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("GradeLevel");
+
+                    b.Navigation("Section");
+                });
+
             modelBuilder.Entity("HaladeHighSchool.Api.Models.Guardian", b =>
                 {
                     b.HasOne("HaladeHighSchool.Api.Models.ApplicationUser", "User")
@@ -2053,7 +2087,15 @@ namespace HaladeHighSchool.Api.Migrations
                         .HasForeignKey("HaladeHighSchool.Api.Models.Student", "UserId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("HaladeHighSchool.Api.Models.GradeLevelSection", "GradeLevelSection")
+                        .WithMany()
+                        .HasForeignKey("GradeLevelId", "SectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("GradeLevel");
+
+                    b.Navigation("GradeLevelSection");
 
                     b.Navigation("Section");
 
@@ -2107,9 +2149,16 @@ namespace HaladeHighSchool.Api.Migrations
                         .HasForeignKey("SectionId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("HaladeHighSchool.Api.Models.GradeLevelSection", "GradeLevelSection")
+                        .WithMany()
+                        .HasForeignKey("GradeLevelId", "SectionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("CreatedStudent");
 
                     b.Navigation("GradeLevel");
+
+                    b.Navigation("GradeLevelSection");
 
                     b.Navigation("Section");
                 });
@@ -2250,6 +2299,8 @@ namespace HaladeHighSchool.Api.Migrations
 
             modelBuilder.Entity("HaladeHighSchool.Api.Models.GradeLevel", b =>
                 {
+                    b.Navigation("SectionLinks");
+
                     b.Navigation("Students");
 
                     b.Navigation("Subjects");
@@ -2262,6 +2313,8 @@ namespace HaladeHighSchool.Api.Migrations
 
             modelBuilder.Entity("HaladeHighSchool.Api.Models.Section", b =>
                 {
+                    b.Navigation("GradeLevelLinks");
+
                     b.Navigation("Students");
 
                     b.Navigation("TeacherSubjects");

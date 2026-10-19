@@ -9,9 +9,8 @@ namespace HaladeHighSchool.Api.Data;
 
 
 /// <summary>
-/// Creates the artefacts the Phase 1 T-SQL script cannot: Identity password hashes must be
-/// produced by <see cref="IPasswordHasher{TUser}"/>, so accounts are created here on
-/// start-up instead. Idempotent - an account that already exists is left untouched.
+/// Creates Identity records whose password hashes must be produced by
+/// <see cref="IPasswordHasher{TUser}"/>. Idempotent: existing accounts are left untouched.
 /// </summary>
 public static class DbSeeder
 {
@@ -209,8 +208,7 @@ public static class DbSeeder
         if (gradeLevelId is null || sectionId is null)
         {
             logger.LogWarning(
-                "No active grade level or section exists, so the demo student was skipped. " +
-                "Run database/01_Create_HaladeHighSchoolDb.sql to seed the academic structure.");
+                "No active grade level or section exists, so the demo student was skipped.");
             return seeded;
         }
 

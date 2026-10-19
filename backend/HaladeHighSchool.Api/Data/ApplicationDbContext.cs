@@ -14,6 +14,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
 
     public DbSet<GradeLevel> GradeLevels => Set<GradeLevel>();
     public DbSet<Section> Sections => Set<Section>();
+    public DbSet<GradeLevelSection> GradeLevelSections => Set<GradeLevelSection>();
     public DbSet<Subject> Subjects => Set<Subject>();
     public DbSet<Student> Students => Set<Student>();
     public DbSet<Teacher> Teachers => Set<Teacher>();
@@ -225,6 +226,22 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.HasIndex(s => s.Code).IsUnique().HasDatabaseName("UQ_Sections_Code");
         });
 
+        builder.Entity<GradeLevelSection>(entity =>
+        {
+            entity.ToTable("GradeLevelSections");
+            entity.HasKey(link => new { link.GradeLevelId, link.SectionId });
+
+            entity.HasOne(link => link.GradeLevel)
+                .WithMany(grade => grade.SectionLinks)
+                .HasForeignKey(link => link.GradeLevelId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(link => link.Section)
+                .WithMany(section => section.GradeLevelLinks)
+                .HasForeignKey(link => link.SectionId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         builder.Entity<Subject>(entity =>
         {
             entity.ToTable("Subjects");
@@ -297,6 +314,12 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
                   .HasForeignKey(s => s.SectionId)
                   .OnDelete(DeleteBehavior.Restrict);
 
+            entity.HasOne(s => s.GradeLevelSection)
+                  .WithMany()
+                  .HasForeignKey(s => new { s.GradeLevelId, s.SectionId })
+                  .HasPrincipalKey(link => new { link.GradeLevelId, link.SectionId })
+                  .OnDelete(DeleteBehavior.Restrict);
+
             entity.HasOne(s => s.User)
                   .WithOne(u => u.Student)
                   .HasForeignKey<Student>(s => s.UserId)
@@ -366,6 +389,12 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.HasOne(r => r.Section)
                   .WithMany()
                   .HasForeignKey(r => r.SectionId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(r => r.GradeLevelSection)
+                  .WithMany()
+                  .HasForeignKey(r => new { r.GradeLevelId, r.SectionId })
+                  .HasPrincipalKey(link => new { link.GradeLevelId, link.SectionId })
                   .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasOne(r => r.CreatedStudent)

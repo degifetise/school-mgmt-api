@@ -162,6 +162,13 @@ public class AccountProvisioningService : IAccountProvisioningService
             return ProvisionResult<Student>.Fail("The selected section does not exist or is inactive.");
         }
 
+        if (!await _db.GradeLevelSections.AnyAsync(
+                link => link.GradeLevelId == request.GradeLevelId && link.SectionId == request.SectionId,
+                cancellationToken))
+        {
+            return ProvisionResult<Student>.Fail("The selected section is not available for that grade level.");
+        }
+
         var occupancy = await _db.Students.CountAsync(
             s => s.GradeLevelId == request.GradeLevelId
               && s.SectionId == request.SectionId

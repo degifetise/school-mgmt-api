@@ -40,6 +40,8 @@ public class Student
 
     public Section? Section { get; set; }
 
+    public GradeLevelSection? GradeLevelSection { get; set; }
+
     public ApplicationUser? User { get; set; }
 
     public ICollection<Mark> Marks { get; set; } = new List<Mark>();
