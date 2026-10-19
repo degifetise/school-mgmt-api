@@ -54,10 +54,10 @@ if (string.IsNullOrWhiteSpace(connectionString))
 // ---------------------------------------------------------------------------
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
-    options.UseSqlServer(connectionString, sql =>
+    options.UseNpgsql(connectionString, postgres =>
     {
-        sql.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(5), errorNumbersToAdd: null);
-        sql.CommandTimeout(60);
+        postgres.EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: TimeSpan.FromSeconds(5), errorCodesToAdd: null);
+        postgres.CommandTimeout(60);
     });
 
     if (builder.Environment.IsDevelopment())
@@ -294,58 +294,7 @@ try
     using (var scope = app.Services.CreateScope())
     {
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-        if (!await db.Database.CanConnectAsync())
-        {
-            logger.LogCritical(
-                "Cannot connect to HaladeHighSchoolDb. Run database/01_Create_HaladeHighSchoolDb.sql first.");
-            throw new InvalidOperationException("HaladeHighSchoolDb is unreachable.");
-        }
-
-        try
-        {
-            // This project uses checked-in SQL scripts rather than EF migrations. Probe the
-            // tables used by analytics, rosters, notifications and student engagement so a partial database fails at
-            // startup with a useful diagnostic instead of surfacing as a request-time 500.
-            await db.Users.AsNoTracking().OrderBy(user => user.Id).Select(user => user.Id).Take(0).ToListAsync();
-            await db.Users.AsNoTracking().OrderBy(user => user.Id).Select(user => user.PhotoUrl).Take(0).ToListAsync();
-            await db.Users.AsNoTracking().OrderBy(user => user.Id).Select(user => user.DigitalSignatureUrl).Take(0).ToListAsync();
-            await db.StudentRegistrationRequests.AsNoTracking()
-                .OrderBy(request => request.Id)
-                .Select(request => request.PhotoUrl)
-                .Take(0)
-                .ToListAsync();
-            await db.Teachers.AsNoTracking().OrderBy(t => t.Id).Select(t => t.Id).Take(0).ToListAsync();
-            await db.Students.AsNoTracking().OrderBy(s => s.Id).Select(s => s.Id).Take(0).ToListAsync();
-            await db.SmartCards.AsNoTracking().OrderBy(card => card.CardId).Select(card => card.CardId).Take(0).ToListAsync();
-            await db.SmartIDScanLogs.AsNoTracking().OrderBy(log => log.Id).Select(log => log.Id).Take(0).ToListAsync();
-            await db.FeeInvoices.AsNoTracking().OrderBy(invoice => invoice.Id).Select(invoice => invoice.Id).Take(0).ToListAsync();
-            await db.FeePayments.AsNoTracking().OrderBy(payment => payment.Id).Select(payment => payment.Id).Take(0).ToListAsync();
-            await db.Sections.AsNoTracking().OrderBy(s => s.Id).Select(s => s.Id).Take(0).ToListAsync();
-            await db.TeacherSubjects.AsNoTracking().OrderBy(ts => ts.Id).Select(ts => ts.Id).Take(0).ToListAsync();
-            await db.Assessments.AsNoTracking().OrderBy(assessment => assessment.Id).Select(assessment => assessment.Id).Take(0).ToListAsync();
-            await db.Attendance.AsNoTracking().OrderBy(attendance => attendance.Id).Select(attendance => attendance.Id).Take(0).ToListAsync();
-            await db.Events.AsNoTracking().OrderBy(schoolEvent => schoolEvent.Id).Select(schoolEvent => schoolEvent.Id).Take(0).ToListAsync();
-            await db.Notifications.AsNoTracking().OrderBy(notification => notification.Id).Select(notification => notification.Id).Take(0).ToListAsync();
-            await db.StudentFeedbacks.AsNoTracking().OrderBy(feedback => feedback.Id).Select(feedback => feedback.Id).Take(0).ToListAsync();
-            await db.EventComments.AsNoTracking().OrderBy(comment => comment.Id).Select(comment => comment.Id).Take(0).ToListAsync();
-            await db.StudentSubjectPerformances.AsNoTracking()
-                .OrderBy(performance => performance.StudentId)
-                .ThenBy(performance => performance.SubjectId)
-                .Select(performance => performance.StudentId)
-                .Take(0)
-                .ToListAsync();
-            logger.LogInformation("Analytics and teacher roster database schema checks passed.");
-        }
-        catch (Exception ex)
-        {
-            logger.LogCritical(
-                ex,
-                "Required analytics, notification, feedback, event-comment, Smart ID tables, or profile-photo columns are missing or inaccessible. Apply the numbered database SQL scripts before starting the API.");
-            throw new InvalidOperationException("HaladeHighSchoolDb schema is incomplete.", ex);
-        }
-
+        logger.LogInformation("Starting database seeding using the configured EF Core provider.");
         await DbSeeder.SeedAsync(scope.ServiceProvider);
     }
 

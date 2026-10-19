@@ -66,14 +66,14 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
         {
             entity.ToTable("SmartCards");
             entity.HasKey(card => card.CardId);
-            entity.Property(card => card.CardId).HasDefaultValueSql("NEWID()");
+            entity.Property(card => card.CardId).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(card => card.UserId).HasMaxLength(450).IsRequired();
             entity.Property(card => card.CardUID).HasMaxLength(100).IsRequired();
             entity.Property(card => card.QrTokenHash).HasMaxLength(512).IsRequired();
             entity.Property(card => card.CardType).HasMaxLength(20).IsRequired();
             entity.Property(card => card.Status).HasMaxLength(20).HasDefaultValue("ACTIVE").IsRequired();
-            entity.Property(card => card.IssuedDate).HasDefaultValueSql("SYSUTCDATETIME()");
-            entity.Property(card => card.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(card => card.IssuedDate).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(card => card.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.HasIndex(card => card.UserId).IsUnique().HasDatabaseName("UQ_SmartCards_UserId");
             entity.HasIndex(card => card.CardUID).IsUnique().HasDatabaseName("UQ_SmartCards_CardUID");
             entity.HasOne(card => card.User)
@@ -91,7 +91,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.Property(log => log.ScannedUserId).HasMaxLength(450);
             entity.Property(log => log.ScanLocation).HasMaxLength(200);
             entity.Property(log => log.ScanStatus).HasMaxLength(20).IsRequired();
-            entity.Property(log => log.ScanTimestamp).HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(log => log.ScanTimestamp).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.HasIndex(log => log.ScanTimestamp).HasDatabaseName("IX_SmartIDScanLogs_ScanTimestamp");
         });
     }
@@ -107,7 +107,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.Property(invoice => invoice.Description).HasMaxLength(200).IsRequired();
             entity.Property(invoice => invoice.AmountDue).HasPrecision(10, 2);
             entity.Property(invoice => invoice.IsVoided).HasDefaultValue(false);
-            entity.Property(invoice => invoice.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(invoice => invoice.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.HasOne(invoice => invoice.Student)
                 .WithMany()
                 .HasForeignKey(invoice => invoice.StudentId)
@@ -125,7 +125,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.Property(payment => payment.AmountPaid).HasPrecision(10, 2);
             entity.Property(payment => payment.PaymentMethod).HasMaxLength(30);
             entity.Property(payment => payment.RecordedByUserId).HasMaxLength(450);
-            entity.Property(payment => payment.PaidAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(payment => payment.PaidAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.HasIndex(payment => payment.InvoiceId).HasDatabaseName("IX_FeePayments_InvoiceId");
         });
     }
@@ -139,7 +139,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.Property(u => u.PhotoUrl).HasMaxLength(500);
             entity.Property(u => u.DigitalSignatureUrl).HasMaxLength(500);
             entity.Property(u => u.IsActive).HasDefaultValue(true);
-            entity.Property(u => u.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(u => u.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.HasIndex(u => u.IsActive).HasDatabaseName("IX_AspNetUsers_IsActive");
         });
 
@@ -149,7 +149,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.Property(t => t.Token).HasMaxLength(256).IsRequired();
             entity.Property(t => t.ReplacedByToken).HasMaxLength(256);
             entity.Property(t => t.CreatedByIp).HasMaxLength(45);
-            entity.Property(t => t.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(t => t.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Ignore(t => t.IsActive);
             entity.HasIndex(t => t.Token).IsUnique().HasDatabaseName("UQ_RefreshTokens_Token");
 
@@ -165,7 +165,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.Property(r => r.UserId).HasMaxLength(450).IsRequired();
             entity.Property(r => r.Token).HasMaxLength(256).IsRequired();
             entity.Property(r => r.RequestedFromIp).HasMaxLength(45);
-            entity.Property(r => r.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(r => r.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.HasIndex(r => r.Token).IsUnique().HasDatabaseName("UQ_PasswordResetRequests_Token");
             entity.HasIndex(r => new { r.UserId, r.ExpiresAt })
                   .HasDatabaseName("IX_PasswordResetRequests_UserId_ExpiresAt");
@@ -181,7 +181,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.ToTable("Attendance");
             entity.Property(a => a.Status).HasMaxLength(20).IsRequired();
             entity.Property(a => a.Remark).HasMaxLength(300);
-            entity.Property(a => a.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(a => a.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.HasIndex(a => new { a.StudentId, a.AttendanceDate })
                   .IsUnique()
                   .HasDatabaseName("UQ_Attendance_Student_Date");
@@ -209,7 +209,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.ToTable("GradeLevels");
             entity.Property(g => g.Name).HasMaxLength(50).IsRequired();
             entity.Property(g => g.Description).HasMaxLength(250);
-            entity.Property(g => g.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(g => g.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.HasIndex(g => g.Name).IsUnique().HasDatabaseName("UQ_GradeLevels_Name");
             entity.HasIndex(g => g.Level).IsUnique().HasDatabaseName("UQ_GradeLevels_Level");
         });
@@ -220,7 +220,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.Property(s => s.Name).HasMaxLength(50).IsRequired();
             entity.Property(s => s.Code).HasMaxLength(10).IsRequired();
             entity.Property(s => s.Capacity).HasDefaultValue(40);
-            entity.Property(s => s.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(s => s.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.HasIndex(s => s.Name).IsUnique().HasDatabaseName("UQ_Sections_Name");
             entity.HasIndex(s => s.Code).IsUnique().HasDatabaseName("UQ_Sections_Code");
         });
@@ -232,7 +232,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.Property(s => s.Code).HasMaxLength(20).IsRequired();
             entity.Property(s => s.Description).HasMaxLength(500);
             entity.Property(s => s.CreditHours).HasDefaultValue(3);
-            entity.Property(s => s.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(s => s.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.HasIndex(s => s.Code).IsUnique().HasDatabaseName("UQ_Subjects_Code");
             entity.HasIndex(s => new { s.SubjectName, s.GradeLevelId })
                   .IsUnique()
@@ -254,13 +254,13 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.Property(t => t.Specialization).HasMaxLength(150);
             entity.Property(t => t.Qualification).HasMaxLength(150);
             entity.Property(t => t.PhoneNumber).HasMaxLength(30);
-            entity.Property(t => t.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(t => t.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.HasIndex(t => t.EmployeeId).IsUnique().HasDatabaseName("UQ_Teachers_EmployeeId");
 
             // Filtered unique index: at most one teacher per login, many rows without a login.
             entity.HasIndex(t => t.UserId)
                   .IsUnique()
-                  .HasFilter("[UserId] IS NOT NULL")
+                  .HasFilter("\"UserId\" IS NOT NULL")
                   .HasDatabaseName("UQ_Teachers_UserId");
 
             entity.HasOne(t => t.User)
@@ -279,12 +279,12 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.Property(s => s.EmergencyContact).HasMaxLength(100);
             entity.Property(s => s.BloodGroup).HasMaxLength(10);
             entity.Property(s => s.Address).HasMaxLength(250);
-            entity.Property(s => s.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(s => s.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.HasIndex(s => s.StudentIdNumber).IsUnique().HasDatabaseName("UQ_Students_StudentIdNumber");
 
             entity.HasIndex(s => s.UserId)
                   .IsUnique()
-                  .HasFilter("[UserId] IS NOT NULL")
+                  .HasFilter("\"UserId\" IS NOT NULL")
                   .HasDatabaseName("UQ_Students_UserId");
 
             entity.HasOne(s => s.GradeLevel)
@@ -308,7 +308,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.ToTable("Guardians");
             entity.Property(g => g.UserId).HasMaxLength(450).IsRequired();
             entity.Property(g => g.PhoneNumber).HasMaxLength(30);
-            entity.Property(g => g.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(g => g.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.HasIndex(g => g.UserId).IsUnique().HasDatabaseName("UQ_Guardians_UserId");
 
             entity.HasOne(g => g.User)
@@ -321,7 +321,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
         {
             entity.ToTable("StudentGuardians");
             entity.Property(sg => sg.Relationship).HasMaxLength(50);
-            entity.Property(sg => sg.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(sg => sg.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.HasIndex(sg => new { sg.GuardianId, sg.StudentId }).IsUnique().HasDatabaseName("UQ_StudentGuardians_Pair");
             entity.HasIndex(sg => sg.GuardianId).HasDatabaseName("IX_StudentGuardians_GuardianId");
 
@@ -344,7 +344,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.Property(r => r.PhotoUrl).HasMaxLength(500);
             entity.Property(r => r.RequestedRole).HasMaxLength(20).HasDefaultValue("Student");
             entity.Property(r => r.Status).HasMaxLength(20).IsRequired();
-            entity.Property(r => r.SubmittedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(r => r.SubmittedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(r => r.ReviewedByUserId).HasMaxLength(450);
             entity.Property(r => r.ReviewNote).HasMaxLength(300);
             entity.Property(r => r.IssuedEmail).HasMaxLength(256);
@@ -352,7 +352,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             // Matches the filtered unique index: one open request per contact address.
             entity.HasIndex(r => r.ContactEmail)
                   .IsUnique()
-                  .HasFilter("[Status] = N'Pending'")
+                  .HasFilter("\"Status\" = 'Pending'")
                   .HasDatabaseName("UQ_StudentRegistrationRequests_PendingContactEmail");
 
             entity.HasIndex(r => new { r.Status, r.SubmittedAt })
@@ -381,7 +381,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.Property(l => l.FailureReason).HasMaxLength(300);
             entity.Property(l => l.IpAddress).HasMaxLength(45);
             entity.Property(l => l.UserAgent).HasMaxLength(400);
-            entity.Property(l => l.ChangedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(l => l.ChangedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.HasIndex(l => new { l.UserId, l.ChangedAt })
                   .HasDatabaseName("IX_PasswordChangeLogs_UserId_ChangedAt");
@@ -396,7 +396,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
         {
             entity.ToTable("TeacherSubjects");
             entity.Property(ts => ts.AcademicYear).HasMaxLength(9).IsRequired();
-            entity.Property(ts => ts.AssignedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(ts => ts.AssignedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.HasIndex(ts => new { ts.TeacherId, ts.SubjectId, ts.SectionId, ts.AcademicYear })
                   .IsUnique()
                   .HasDatabaseName("UQ_TeacherSubjects_Assignment");
@@ -428,7 +428,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.Property(l => l.FileName).HasMaxLength(255);
             entity.Property(l => l.ContentType).HasMaxLength(100);
             entity.Property(l => l.IsPublished).HasDefaultValue(true);
-            entity.Property(l => l.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(l => l.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.HasOne(l => l.Subject)
                   .WithMany(s => s.Lessons)
@@ -466,7 +466,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.Property(a => a.MaxScore).HasPrecision(6, 2);
             entity.Property(a => a.AcademicYear).HasMaxLength(9).IsRequired();
             entity.Property(a => a.IsActive).HasDefaultValue(true);
-            entity.Property(a => a.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(a => a.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             // Stored as text to satisfy FK_Assessments_AssessmentTypes_AssessmentType.
             entity.Property(a => a.AssessmentType)
@@ -499,7 +499,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
 
             entity.Property(m => m.Score).HasPrecision(6, 2);
             entity.Property(m => m.Remark).HasMaxLength(300);
-            entity.Property(m => m.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(m => m.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.HasIndex(m => new { m.StudentId, m.AssessmentId })
                   .IsUnique()
@@ -537,7 +537,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.Property(a => a.Content).IsRequired();
             entity.Property(a => a.TargetRole).HasMaxLength(20).HasDefaultValue("All").IsRequired();
             entity.Property(a => a.IsPublished).HasDefaultValue(true);
-            entity.Property(a => a.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(a => a.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.HasOne(a => a.GradeLevel)
                   .WithMany()
@@ -562,7 +562,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.Property(s => s.Key).HasMaxLength(100);
             entity.Property(s => s.Value).HasMaxLength(500);
             entity.Property(s => s.Description).HasMaxLength(300);
-            entity.Property(s => s.UpdatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(s => s.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         });
 
             builder.Entity<Event>(entity =>
@@ -578,7 +578,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
                   entity.Property(e => e.TargetSectionIdsCsv).HasMaxLength(1000);
                   entity.Property(e => e.StatusOverride).HasMaxLength(20);
                   entity.Property(e => e.RegistrationDeadline).HasColumnName("RegistrationDeadline");
-                  entity.Property(e => e.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+                  entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
                   entity.Property(e => e.IsDeleted).HasDefaultValue(false);
                   entity.HasIndex(e => e.StartsAt).HasDatabaseName("IX_Events_StartDate");
                   entity.HasIndex(e => e.Category).HasDatabaseName("IX_Events_Category");
@@ -594,7 +594,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
                   entity.ToTable("EventRegistrations");
                   entity.Property(r => r.Status).HasMaxLength(20).HasDefaultValue(EventRegistrationStatuses.Confirmed).IsRequired();
                   entity.Property(r => r.AttendanceStatus).HasMaxLength(20).HasDefaultValue(EventAttendanceStatuses.Pending).IsRequired();
-                  entity.Property(r => r.RegisteredAt).HasDefaultValueSql("SYSUTCDATETIME()");
+                  entity.Property(r => r.RegisteredAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
                   entity.HasIndex(r => new { r.EventId, r.StudentId }).IsUnique().HasDatabaseName("UQ_EventRegistrations_Event_Student");
                   entity.HasOne(r => r.Event).WithMany(e => e.Registrations).HasForeignKey(r => r.EventId).OnDelete(DeleteBehavior.Cascade);
                   entity.HasOne(r => r.Student).WithMany().HasForeignKey(r => r.StudentId).OnDelete(DeleteBehavior.Cascade);
@@ -608,7 +608,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
                   entity.Property(n => n.Message).HasMaxLength(1000).IsRequired();
                   entity.Property(n => n.Type).HasMaxLength(30).IsRequired();
                   entity.Property(n => n.TargetUrl).HasMaxLength(500).IsRequired();
-                  entity.Property(n => n.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+                  entity.Property(n => n.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
                   entity.HasIndex(n => new { n.UserId, n.ReadAt, n.CreatedAt })
                       .HasDatabaseName("IX_Notifications_User_Read_Created");
                   entity.HasOne<ApplicationUser>().WithMany().HasForeignKey(n => n.UserId).OnDelete(DeleteBehavior.Cascade);
@@ -626,7 +626,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
                   .HasMaxLength(30)
                   .HasDefaultValue(StudentFeedbackStatuses.PendingReview)
                   .IsRequired();
-            entity.Property(feedback => feedback.SubmittedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(feedback => feedback.SubmittedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.HasIndex(feedback => new { feedback.Status, feedback.SubmittedAt })
                   .HasDatabaseName("IX_StudentFeedbacks_Status_SubmittedAt");
             entity.HasOne(feedback => feedback.Student)
@@ -642,7 +642,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.Property(comment => comment.UserName).HasMaxLength(150).IsRequired();
             entity.Property(comment => comment.UserRole).HasMaxLength(20).IsRequired();
             entity.Property(comment => comment.CommentText).HasMaxLength(2000).IsRequired();
-            entity.Property(comment => comment.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(comment => comment.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.HasIndex(comment => new { comment.EventId, comment.CreatedAt })
                   .HasDatabaseName("IX_EventComments_Event_CreatedAt");
             entity.HasIndex(comment => comment.ParentCommentId)

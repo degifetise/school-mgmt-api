@@ -1,8 +1,6 @@
 using System.Security.Cryptography;
-using System.Data;
 using HaladeHighSchool.Api.Data;
 using HaladeHighSchool.Api.Models;
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
 namespace HaladeHighSchool.Api.Services;
@@ -25,16 +23,21 @@ public sealed class SmartIDCardService
         string cardType,
         CancellationToken cancellationToken)
     {
-        var cardUidParameter = new SqlParameter("@CardUID", SqlDbType.NVarChar, 100)
+        await _db.Database.OpenConnectionAsync(cancellationToken);
+        string cardUid;
+        try
         {
-            Direction = ParameterDirection.Output
-        };
-        await _db.Database.ExecuteSqlRawAsync(
-            "EXEC dbo.GenerateSmartCardSerial @CardUID OUTPUT",
-            new object[] { cardUidParameter },
-            cancellationToken);
-        var cardUid = cardUidParameter.Value as string
-            ?? throw new InvalidOperationException("The Smart ID serial procedure did not return a card UID.");
+            await using var command = _db.Database.GetDbConnection().CreateCommand();
+            command.CommandText =
+                "SELECT 'SID-' || EXTRACT(YEAR FROM CURRENT_TIMESTAMP)::int::text || '-' || " +
+                "LPAD(nextval('\"SmartCardSerialSequence\"')::text, 8, '0');";
+            cardUid = (string?)await command.ExecuteScalarAsync(cancellationToken)
+                ?? throw new InvalidOperationException("The Smart ID serial sequence did not return a card UID.");
+        }
+        finally
+        {
+            await _db.Database.CloseConnectionAsync();
+        }
 
         var tokenKey = RandomNumberGenerator.GetBytes(32);
         var protectedKey = _tokenKeyProtector.Protect(tokenKey);
