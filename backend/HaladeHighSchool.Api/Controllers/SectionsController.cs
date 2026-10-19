@@ -25,10 +25,17 @@ public class SectionsController : PortalControllerBase
     [HttpGet]
     [ProducesResponseType<IEnumerable<SectionResponse>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<SectionResponse>>> GetSections(
+        [FromQuery] int? gradeLevelId = null,
         [FromQuery] bool includeInactive = false,
         CancellationToken cancellationToken = default)
     {
         var query = _db.Sections.AsNoTracking();
+
+        if (gradeLevelId is int selectedGrade)
+        {
+            query = query.Where(section =>
+                section.GradeLevelLinks.Any(link => link.GradeLevelId == selectedGrade));
+        }
 
         if (!includeInactive)
         {
@@ -44,7 +51,8 @@ public class SectionsController : PortalControllerBase
                 Code = s.Code,
                 Capacity = s.Capacity,
                 IsActive = s.IsActive,
-                StudentCount = s.Students.Count(st => st.IsActive)
+                StudentCount = s.Students.Count(st =>
+                    st.IsActive && (gradeLevelId == null || st.GradeLevelId == gradeLevelId))
             })
             .ToListAsync(cancellationToken);
 
@@ -76,7 +84,16 @@ public class SectionsController : PortalControllerBase
             CreatedAt = DateTime.UtcNow
         };
 
+        var gradeLevelIds = await _db.GradeLevels
+            .Select(gradeLevel => gradeLevel.Id)
+            .ToListAsync(cancellationToken);
+
         _db.Sections.Add(section);
+        _db.GradeLevelSections.AddRange(gradeLevelIds.Select(gradeLevelId => new GradeLevelSection
+        {
+            GradeLevelId = gradeLevelId,
+            Section = section
+        }));
         await _db.SaveChangesAsync(cancellationToken);
 
         return CreatedAtAction(nameof(GetSections), new { }, new SectionResponse

@@ -141,6 +141,16 @@ public class RegistrationRequestService : IRegistrationRequestService
                     "Unknown section",
                     "That section does not exist or is not taking students.");
             }
+
+            if (!await _db.GradeLevelSections.AnyAsync(
+                    link => link.GradeLevelId == gradeLevelId && link.SectionId == sectionId,
+                    cancellationToken))
+            {
+                return RegistrationResult<StudentRegistrationRequest>.Fail(
+                    RegistrationFailure.Invalid,
+                    "Section is not available",
+                    "That section is not available for the selected grade.");
+            }
         }
 
         // A second application while one is outstanding is a duplicate, not a new applicant.
@@ -363,6 +373,16 @@ public class RegistrationRequestService : IRegistrationRequestService
                 RegistrationFailure.Invalid,
                 "Incomplete student application",
                 "A student application must include a grade and section.");
+        }
+
+        if (!isTeacher && !await _db.GradeLevelSections.AnyAsync(
+                link => link.GradeLevelId == request.GradeLevelId && link.SectionId == request.SectionId,
+                cancellationToken))
+        {
+            return RegistrationResult<ApprovedRegistrationResponse>.Fail(
+                RegistrationFailure.Invalid,
+                "Section is not available",
+                "That section is no longer available for the selected grade.");
         }
 
         /* Checked before provisioning as well as inside it: the class may have filled up while

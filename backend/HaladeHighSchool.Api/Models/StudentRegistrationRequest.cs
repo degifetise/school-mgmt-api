@@ -66,5 +66,7 @@ public class StudentRegistrationRequest
 
     public Section? Section { get; set; }
 
+    public GradeLevelSection? GradeLevelSection { get; set; }
+
     public Student? CreatedStudent { get; set; }
 }

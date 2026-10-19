@@ -286,13 +286,8 @@ app.MapControllers();
 // ---------------------------------------------------------------------------
 try
 {
-    using (var scope = app.Services.CreateScope())
-    {
-        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-        logger.LogInformation("Starting database seeding using the configured EF Core provider.");
-        await DbSeeder.SeedAsync(scope.ServiceProvider);
-    }
-
+    app.Logger.LogInformation("Applying pending database migrations and seeding master data.");
+    await app.InitializeDatabaseAsync();
     app.Run();
 }
 catch (Exception ex)

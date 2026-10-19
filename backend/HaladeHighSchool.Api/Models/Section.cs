@@ -17,5 +17,7 @@ public class Section
 
     public ICollection<Student> Students { get; set; } = new List<Student>();
 
+    public ICollection<GradeLevelSection> GradeLevelLinks { get; set; } = new List<GradeLevelSection>();
+
     public ICollection<TeacherSubject> TeacherSubjects { get; set; } = new List<TeacherSubject>();
 }
