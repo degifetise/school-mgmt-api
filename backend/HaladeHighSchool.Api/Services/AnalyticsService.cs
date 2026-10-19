@@ -1,5 +1,6 @@
 using HaladeHighSchool.Api.Data;
 using HaladeHighSchool.Api.DTOs;
+using HaladeHighSchool.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace HaladeHighSchool.Api.Services;
@@ -7,6 +8,13 @@ namespace HaladeHighSchool.Api.Services;
 public sealed class AnalyticsService(ApplicationDbContext db) : IAnalyticsService
 {
     private const decimal PassMarkPercentage = 50m;
+
+    private sealed record PublishedMark(
+        int StudentId,
+        int SubjectId,
+        AssessmentType AssessmentType,
+        decimal Score,
+        decimal MaxScore);
 
     public async Task<AdminAnalyticsOverviewResponse> GetAdminOverviewAsync(
         CancellationToken cancellationToken)
@@ -18,21 +26,32 @@ public sealed class AnalyticsService(ApplicationDbContext db) : IAnalyticsServic
             .AsNoTracking()
             .CountAsync(teacher => teacher.IsActive, cancellationToken);
 
-        var gradeCounts = await db.Students
-            .AsNoTracking()
-            .Where(student => student.IsActive && student.GradeLevel != null)
-            .GroupBy(student => student.GradeLevel!.Level)
-            .Select(group => new { GradeLevel = group.Key, StudentCount = group.Count() })
+        var gradeCounts = await (
+            from student in db.Students.AsNoTracking()
+            join grade in db.GradeLevels.AsNoTracking()
+                on student.GradeLevelId equals grade.Id
+            where student.IsActive
+            group student by grade.Level into studentsByGrade
+            select new { GradeLevel = studentsByGrade.Key, StudentCount = studentsByGrade.Count() })
             .ToDictionaryAsync(row => row.GradeLevel, row => row.StudentCount, cancellationToken);
 
-        var studentAverages = await (
-            from performance in db.StudentSubjectPerformances.AsNoTracking()
+        var publishedMarks = await (
+            from mark in db.Marks.AsNoTracking()
             join student in db.Students.AsNoTracking()
-                on performance.StudentId equals student.Id
-            where student.IsActive
-            group performance by student.Id into studentResults
-            select studentResults.Average(result => result.TotalScore))
+                on mark.StudentId equals student.Id
+            join assessment in db.Assessments.AsNoTracking()
+                on mark.AssessmentId equals assessment.Id
+            where student.IsActive && mark.IsPublished && assessment.MaxScore > 0
+            select new PublishedMark(
+                student.Id,
+                mark.SubjectId,
+                assessment.AssessmentType,
+                mark.Score,
+                assessment.MaxScore))
             .ToListAsync(cancellationToken);
+
+        var weights = await GetActiveWeightsAsync(cancellationToken);
+        var studentAverages = CalculateStudentAverages(publishedMarks, weights);
 
         var gradeDistribution = Enumerable.Range(9, 4)
             .Select(level => new GradeEnrollmentResponse(
@@ -50,42 +69,55 @@ public sealed class AnalyticsService(ApplicationDbContext db) : IAnalyticsServic
             PassMarkPercentage);
     }
 
-    public async Task<TeacherAnalyticsPerformanceResponse?> GetTeacherPerformanceAsync(
-        string? userId,
+    public async Task<TeacherAnalyticsPerformanceResponse> GetTeacherPerformanceAsync(
+        int? requestedTeacherId,
         CancellationToken cancellationToken)
     {
-        var teacherId = await db.Teachers
-            .AsNoTracking()
-            .Where(teacher => teacher.IsActive && teacher.UserId == userId)
-            .Select(teacher => (int?)teacher.Id)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (teacherId is null)
+        if (requestedTeacherId is not int teacherId)
         {
-            return null;
+            return EmptyTeacherResponse();
+        }
+
+        var teacherExists = await db.Teachers
+            .AsNoTracking()
+            .AnyAsync(teacher => teacher.Id == teacherId && teacher.IsActive, cancellationToken);
+
+        if (!teacherExists)
+        {
+            return EmptyTeacherResponse();
         }
 
         var assignedClassCount = await db.TeacherSubjects
             .AsNoTracking()
-            .CountAsync(
-                assignment => assignment.TeacherId == teacherId && assignment.IsActive,
-                cancellationToken);
+            .CountAsync(assignment => assignment.TeacherId == teacherId && assignment.IsActive, cancellationToken);
 
-        var studentAverages = await (
+        var publishedMarks = await (
             from assignment in db.TeacherSubjects.AsNoTracking()
             join student in db.Students.AsNoTracking()
                 on assignment.SectionId equals student.SectionId
-            join performance in db.StudentSubjectPerformances.AsNoTracking()
-                on new { StudentId = student.Id, assignment.SubjectId }
-                equals new { performance.StudentId, performance.SubjectId }
+            join subject in db.Subjects.AsNoTracking()
+                on assignment.SubjectId equals subject.Id
+            join assessment in db.Assessments.AsNoTracking()
+                on subject.Id equals assessment.SubjectId
+            join mark in db.Marks.AsNoTracking()
+                on new { StudentId = student.Id, AssessmentId = assessment.Id, SubjectId = subject.Id }
+                equals new { mark.StudentId, mark.AssessmentId, mark.SubjectId }
             where assignment.TeacherId == teacherId
                 && assignment.IsActive
                 && student.IsActive
-                && assignment.Subject != null
-                && assignment.Subject.GradeLevelId == student.GradeLevelId
-            group performance by student.Id into studentResults
-            select studentResults.Average(result => result.TotalScore))
+                && subject.GradeLevelId == student.GradeLevelId
+                && mark.IsPublished
+                && assessment.MaxScore > 0
+            select new PublishedMark(
+                student.Id,
+                subject.Id,
+                assessment.AssessmentType,
+                mark.Score,
+                assessment.MaxScore))
             .ToListAsync(cancellationToken);
+
+        var weights = await GetActiveWeightsAsync(cancellationToken);
+        var studentAverages = CalculateStudentAverages(publishedMarks, weights);
 
         return new TeacherAnalyticsPerformanceResponse(
             assignedClassCount,
@@ -94,4 +126,52 @@ public sealed class AnalyticsService(ApplicationDbContext db) : IAnalyticsServic
             studentAverages.Count(average => average < PassMarkPercentage),
             PassMarkPercentage);
     }
+
+    private async Task<IReadOnlyDictionary<string, decimal>> GetActiveWeightsAsync(
+        CancellationToken cancellationToken) =>
+        await db.AssessmentTypeWeights
+            .AsNoTracking()
+            .Where(weight => weight.IsActive)
+            .ToDictionaryAsync(
+                weight => weight.Name,
+                weight => weight.WeightPercentage,
+                StringComparer.OrdinalIgnoreCase,
+                cancellationToken);
+
+    private static List<decimal> CalculateStudentAverages(
+        IEnumerable<PublishedMark> marks,
+        IReadOnlyDictionary<string, decimal> weights)
+    {
+        var subjectTotals = marks
+            .GroupBy(mark => new { mark.StudentId, mark.SubjectId, mark.AssessmentType })
+            .Select(group =>
+            {
+                var possible = group.Sum(mark => mark.MaxScore);
+                if (possible <= 0
+                    || !weights.TryGetValue(group.Key.AssessmentType.ToString(), out var weight))
+                {
+                    return (group.Key.StudentId, group.Key.SubjectId, Score: (decimal?)null);
+                }
+
+                return (
+                    group.Key.StudentId,
+                    group.Key.SubjectId,
+                    Score: (decimal?)(group.Sum(mark => mark.Score) / possible * weight));
+            })
+            .Where(result => result.Score.HasValue)
+            .GroupBy(result => new { result.StudentId, result.SubjectId })
+            .Select(group => new
+            {
+                group.Key.StudentId,
+                Total = group.Sum(result => result.Score.GetValueOrDefault())
+            });
+
+        return subjectTotals
+            .GroupBy(result => result.StudentId)
+            .Select(group => group.Average(result => result.Total))
+            .ToList();
+    }
+
+    private static TeacherAnalyticsPerformanceResponse EmptyTeacherResponse() =>
+        new(0, 0, 0, 0, PassMarkPercentage);
 }

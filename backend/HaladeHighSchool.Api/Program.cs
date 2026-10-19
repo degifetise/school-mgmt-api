@@ -143,13 +143,11 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
-// ---------------------------------------------------------------------------
-// CORS for the Vercel frontend
-// ---------------------------------------------------------------------------
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowVercelFrontend", policy => policy
-        .WithOrigins("https://school-mgmt-api.vercel.app")
+        .WithOrigins("https://school-mgmt-api.vercel.app", "http://localhost:5173")
         .AllowAnyHeader()
         .AllowAnyMethod()
         .WithExposedHeaders("X-Token-Expired", "Content-Disposition")
@@ -194,14 +192,7 @@ builder.Services
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
 
-builder.Services.AddAutoMapper(configuration =>
-{
-    var licenseKey = builder.Configuration["AutoMapper:LicenseKey"];
-    if (!string.IsNullOrWhiteSpace(licenseKey))
-    {
-        configuration.LicenseKey = licenseKey;
-    }
-}, typeof(Program).Assembly);
+builder.Services.AddAutoMapper(_ => { }, typeof(Program).Assembly);
 builder.Services.AddValidatorsFromAssemblyContaining<HaladeHighSchool.Api.Validation.CreateEventDtoValidator>();
 
 builder.Services.AddProblemDetails();

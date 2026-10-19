@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Npgsql;
 
 namespace HaladeHighSchool.Api.Controllers;
 
@@ -31,6 +32,7 @@ public sealed class SmartIDController : PortalControllerBase
     private readonly SmartIDTokenKeyProtector _tokenKeyProtector;
     private readonly IProfilePhotoStorage _photoStorage;
     private readonly ILogger<SmartIDController> _logger;
+    private readonly IWebHostEnvironment _environment;
 
     public SmartIDController(
         ApplicationDbContext db,
@@ -38,7 +40,8 @@ public sealed class SmartIDController : PortalControllerBase
         SmartIDCardService cardService,
         SmartIDTokenKeyProtector tokenKeyProtector,
         IProfilePhotoStorage photoStorage,
-        ILogger<SmartIDController> logger)
+        ILogger<SmartIDController> logger,
+        IWebHostEnvironment environment)
     {
         _db = db;
         _userManager = userManager;
@@ -46,6 +49,7 @@ public sealed class SmartIDController : PortalControllerBase
         _tokenKeyProtector = tokenKeyProtector;
         _photoStorage = photoStorage;
         _logger = logger;
+        _environment = environment;
     }
 
     [HttpGet("card-details/{userId}")]
@@ -228,36 +232,164 @@ public sealed class SmartIDController : PortalControllerBase
     [HttpPost("admin/users/{userId}/generate")]
     [Authorize(Roles = Roles.Admin)]
     [ProducesResponseType<SmartIDCardDetails>(StatusCodes.Status201Created)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<SmartIDCardDetails>> GenerateCardForUser(
         string userId,
         CancellationToken cancellationToken)
     {
-        var user = await _userManager.FindByIdAsync(userId);
-        if (user is null)
+        try
         {
-            return NotFoundProblem("The requested account was not found.");
-        }
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return BadRequestProblem("Invalid user", "A valid user ID is required.");
+            }
 
-        if (await _db.SmartCards.AnyAsync(card => card.UserId == userId, cancellationToken))
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user is null)
+            {
+                return NotFoundProblem("The requested account was not found.");
+            }
+
+            if (string.IsNullOrWhiteSpace(user.FullName))
+            {
+                return BadRequestProblem("Incomplete profile", "The account must have a full name.");
+            }
+
+            if (await _db.SmartCards.AnyAsync(card => card.UserId == userId, cancellationToken))
+            {
+                return ConflictProblem("Smart ID already generated", "This account already has a Smart ID.");
+            }
+
+            var cardType = await ResolveCardTypeAsync(user);
+            if (cardType is null)
+            {
+                return BadRequestProblem(
+                    "Unsupported account",
+                    "Only student, teacher, and staff accounts can receive a Smart ID.");
+            }
+
+            var photoUrl = user.PhotoUrl ?? user.ProfileImageUrl;
+            if (string.IsNullOrWhiteSpace(photoUrl))
+            {
+                return BadRequestProblem(
+                    "Profile photo required",
+                    "Add a profile photo to this account before generating its Smart ID.");
+            }
+
+            if (cardType == "STUDENT")
+            {
+                var studentProfile = await _db.Students
+                    .AsNoTracking()
+                    .Include(student => student.GradeLevel)
+                    .Include(student => student.Section)
+                    .FirstOrDefaultAsync(student => student.UserId == userId, cancellationToken);
+
+                if (studentProfile is null)
+                {
+                    return BadRequestProblem(
+                        "Incomplete student profile",
+                        "The account does not have a student profile.");
+                }
+
+                if (string.IsNullOrWhiteSpace(studentProfile.StudentIdNumber)
+                    || studentProfile.GradeLevel is null
+                    || studentProfile.Section is null)
+                {
+                    return BadRequestProblem(
+                        "Incomplete student profile",
+                        "The student must have an ID number, grade level, and section before generating a Smart ID.");
+                }
+            }
+            else if (cardType == "TEACHER")
+            {
+                var teacherProfile = await _db.Teachers.AsNoTracking()
+                    .FirstOrDefaultAsync(teacher => teacher.UserId == userId, cancellationToken);
+
+                if (teacherProfile is null || string.IsNullOrWhiteSpace(teacherProfile.EmployeeId))
+                {
+                    return BadRequestProblem(
+                        "Incomplete teacher profile",
+                        "The account must have a teacher profile with an employee ID.");
+                }
+            }
+
+            SmartIDCardDetails? details = null;
+            var strategy = _db.Database.CreateExecutionStrategy();
+            await strategy.ExecuteAsync(async () =>
+            {
+                await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+                SmartCard? generatedCard = null;
+                try
+                {
+                    generatedCard = await _cardService.AddCardAsync(user, cardType, cancellationToken);
+                    await _db.SaveChangesAsync(cancellationToken);
+
+                    details = await FindCardDetailsAsync(userId, cancellationToken);
+                    if (details is null)
+                    {
+                        throw new InvalidOperationException(
+                            "The Smart ID card was saved, but the related cardholder data could not be loaded.");
+                    }
+
+                    await transaction.CommitAsync(cancellationToken);
+                }
+                catch
+                {
+                    if (generatedCard is not null)
+                    {
+                        _db.Entry(generatedCard).State = EntityState.Detached;
+                    }
+
+                    throw;
+                }
+            });
+
+            if (details is null)
+            {
+                throw new InvalidOperationException(
+                    "The Smart ID card transaction completed without returning card details.");
+            }
+
+            return CreatedAtAction(nameof(GetCardDetails), new { userId }, details);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            throw;
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex, "Invalid Smart ID generation request for user {UserId}", userId);
+            return BadRequestProblem("Invalid Smart ID request", ex.Message);
+        }
+        catch (DbUpdateException ex) when (
+            ex.GetBaseException() is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            _logger.LogInformation(ex, "A Smart ID card already exists for user {UserId}", userId);
             return ConflictProblem("Smart ID already generated", "This account already has a Smart ID.");
         }
-
-        var cardType = await ResolveCardTypeAsync(user);
-        if (cardType is null)
+        catch (Exception ex)
         {
-            return BadRequestProblem("Unsupported account", "Only student, teacher, and staff accounts can receive a Smart ID.");
-        }
+            _logger.LogError(ex, "Detailed error: {Message}", ex.Message);
 
-        await _cardService.AddCardAsync(user, cardType, cancellationToken);
-        await _db.SaveChangesAsync(cancellationToken);
-        var details = await FindCardDetailsAsync(userId, cancellationToken);
-        if (details is null)
-        {
-            throw new InvalidOperationException("The Smart ID was generated but could not be loaded.");
-        }
+            if (_environment.IsDevelopment())
+            {
+                return BadRequest(new
+                {
+                    message = ex.Message,
+                    inner = ex.InnerException?.Message,
+                    stackTrace = ex.StackTrace
+                });
+            }
 
-        return CreatedAtAction(nameof(GetCardDetails), new { userId }, details);
+            return StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetails
+            {
+                Title = "Smart ID generation failed",
+                Detail = "The Smart ID could not be generated. Check the server logs for details.",
+                Status = StatusCodes.Status500InternalServerError
+            });
+        }
     }
 
     [HttpPost("batch-cards")]
