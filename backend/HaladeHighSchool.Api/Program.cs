@@ -15,8 +15,6 @@ using FluentValidation.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-const string CorsPolicy = "HaladeFrontend";
-
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
@@ -146,15 +144,12 @@ builder.Services
 builder.Services.AddAuthorization();
 
 // ---------------------------------------------------------------------------
-// CORS for the Vite dev server
+// CORS for the Vercel frontend
 // ---------------------------------------------------------------------------
-var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-    ?? ["http://localhost:5173"];
-
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy(CorsPolicy, policy => policy
-        .WithOrigins(allowedOrigins)
+    options.AddPolicy("AllowVercelFrontend", policy => policy
+        .WithOrigins("https://school-mgmt-api.vercel.app")
         .AllowAnyHeader()
         .AllowAnyMethod()
         .WithExposedHeaders("X-Token-Expired", "Content-Disposition")
@@ -241,6 +236,7 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
+app.UseCors("AllowVercelFrontend");
 
 // ---------------------------------------------------------------------------
 // Pipeline
@@ -279,7 +275,6 @@ app.Use(async (context, next) =>
     await next();
 });
 
-app.UseCors(CorsPolicy);
 app.UseStaticFiles();
 
 app.UseAuthentication();
