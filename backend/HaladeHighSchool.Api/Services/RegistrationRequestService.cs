@@ -434,7 +434,17 @@ public class RegistrationRequestService : IRegistrationRequestService
                     Email = request.ContactEmail,
                     PhotoUrl = request.PhotoUrl,
                 },
-                cancellationToken)
+                cancellationToken,
+                async (teacher, teacherEmail, token) =>
+                {
+                    request.Status = RegistrationRequestStatus.Approved;
+                    request.ReviewedAt = DateTime.UtcNow;
+                    request.ReviewedByUserId = reviewerUserId;
+                    request.ReviewNote = Trim(note);
+                    request.CreatedStudentId = null;
+                    request.IssuedEmail = teacherEmail;
+                    await _db.SaveChangesAsync(token);
+                })
             : null;
 
         if ((studentProvisioned is null || !studentProvisioned.Succeeded || studentProvisioned.Entity is null)
@@ -454,23 +464,46 @@ public class RegistrationRequestService : IRegistrationRequestService
             .Select(u => u.Email)
             .FirstOrDefaultAsync(cancellationToken) ?? string.Empty;
 
-        if (isTeacher)
-        {
-            request.Status = RegistrationRequestStatus.Approved;
-            request.ReviewedAt = DateTime.UtcNow;
-            request.ReviewedByUserId = reviewerUserId;
-            request.ReviewNote = Trim(note);
-            request.CreatedStudentId = null;
-            request.IssuedEmail = issuedEmail;
-
-            await _db.SaveChangesAsync(cancellationToken);
-        }
-
         _logger.LogInformation(
             "Registration request {RequestId} approved as {RequestedRole} by {Reviewer}",
             request.Id,
             request.RequestedRole,
             reviewerUserId);
+
+        var temporaryPassword =
+            studentProvisioned?.TemporaryPassword ?? teacherProvisioned?.TemporaryPassword ?? string.Empty;
+
+        var emailSent = false;
+        try
+        {
+            if (isTeacher)
+            {
+                await _emailService.SendTeacherApprovalEmailAsync(
+                    request.ContactEmail,
+                    request.FullName,
+                    temporaryPassword,
+                    cancellationToken);
+            }
+            else
+            {
+                await _emailService.SendStudentApprovalEmailAsync(
+                    request.ContactEmail,
+                    request.FullName,
+                    issuedEmail,
+                    temporaryPassword,
+                    cancellationToken);
+            }
+
+            emailSent = true;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogError(
+                ex,
+                "Approval email failed for registration request {RequestId} ({Role})",
+                request.Id,
+                request.RequestedRole);
+        }
 
         var approvedResponse = new ApprovedRegistrationResponse
         {
@@ -484,42 +517,18 @@ public class RegistrationRequestService : IRegistrationRequestService
             IssuedEmail = issuedEmail,
             ContactEmail = request.ContactEmail,
             // Provisioning returns only a generated password; Identity stores its hash.
-            TemporaryPassword = studentProvisioned?.TemporaryPassword ?? teacherProvisioned?.TemporaryPassword ?? string.Empty,
+            TemporaryPassword = temporaryPassword,
+            EmailSent = emailSent,
             GradeLevelName = request.GradeLevel?.Name,
             SectionName = request.Section?.Name,
-            ApprovedAt = request.ReviewedAt!.Value,
-            Message =
-                $"Credentials were emailed to {request.ContactEmail}. The temporary password is shown once "
-              + "and cannot be retrieved again; the new account holder should change it after signing in.",
+            ApprovedAt = request.ReviewedAt
+                ?? throw new InvalidOperationException("Approved registration is missing its review timestamp."),
+            Message = emailSent
+                ? $"Credentials were emailed to {request.ContactEmail}. The temporary password is shown once "
+                    + "and cannot be retrieved again; the new account holder should change it after signing in."
+                : $"The account was approved, but credentials could not be emailed to {request.ContactEmail}. "
+                    + "Share the credentials shown here securely. The temporary password cannot be retrieved again.",
         };
-
-        try
-        {
-            if (isTeacher)
-            {
-                await _emailService.SendTeacherApprovalEmailAsync(
-                    request.ContactEmail,
-                    request.FullName,
-                    approvedResponse.TemporaryPassword);
-            }
-            else
-            {
-                await _emailService.SendStudentApprovalEmailAsync(
-                    request.ContactEmail,
-                    request.FullName,
-                    issuedEmail,
-                    approvedResponse.TemporaryPassword);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(
-                ex,
-                "Approval email failed for registration request {RequestId} ({Role})",
-                request.Id,
-                request.RequestedRole);
-            throw;
-        }
 
         return RegistrationResult<ApprovedRegistrationResponse>.Ok(approvedResponse);
     }

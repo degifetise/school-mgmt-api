@@ -18,7 +18,8 @@ public sealed class EmailService : IEmailService
         string toEmail,
         string fullName,
         string generatedSchoolEmail,
-        string tempPassword) =>
+        string tempPassword,
+        CancellationToken cancellationToken = default) =>
         SendAsync(
             toEmail,
             "Your school issued account is ready",
@@ -31,12 +32,14 @@ public sealed class EmailService : IEmailService
             "Your school issued account has been approved.\n\n" +
             $"School email: {generatedSchoolEmail}\n" +
             $"Temporary password: {tempPassword}\n\n" +
-            "Sign in with these credentials and change your password after signing in.");
+            "Sign in with these credentials and change your password after signing in.",
+            cancellationToken);
 
     public Task SendTeacherApprovalEmailAsync(
         string toEmail,
         string fullName,
-        string registeredPassword) =>
+        string registeredPassword,
+        CancellationToken cancellationToken = default) =>
         SendAsync(
             toEmail,
             "Your school issued account is ready",
@@ -49,9 +52,15 @@ public sealed class EmailService : IEmailService
             "Your school issued account has been approved.\n\n" +
             $"Sign-in email: {toEmail}\n" +
             $"Password: {registeredPassword}\n\n" +
-            "Sign in with these credentials and change your password after signing in.");
+            "Sign in with these credentials and change your password after signing in.",
+            cancellationToken);
 
-    private async Task SendAsync(string toEmail, string subject, string htmlBody, string textBody)
+    private async Task SendAsync(
+        string toEmail,
+        string subject,
+        string htmlBody,
+        string textBody,
+        CancellationToken cancellationToken)
     {
         var smtpServer = GetRequiredSetting("EmailSettings:SmtpServer");
         var senderEmail = GetRequiredSetting("EmailSettings:SenderEmail");
@@ -79,10 +88,10 @@ public sealed class EmailService : IEmailService
         }.ToMessageBody();
 
         using var client = new SmtpClient();
-        await client.ConnectAsync(smtpServer, port, SecureSocketOptions.StartTls);
-        await client.AuthenticateAsync(senderEmail, password);
-        await client.SendAsync(message);
-        await client.DisconnectAsync(true);
+        await client.ConnectAsync(smtpServer, port, SecureSocketOptions.StartTls, cancellationToken);
+        await client.AuthenticateAsync(senderEmail, password, cancellationToken);
+        await client.SendAsync(message, cancellationToken);
+        await client.DisconnectAsync(true, cancellationToken);
     }
 
     private string GetRequiredSetting(string key)

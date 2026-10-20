@@ -63,6 +63,9 @@ public record ApprovedRegistrationResponse
     /// <summary>Shown once. Not recoverable.</summary>
     public string TemporaryPassword { get; init; } = string.Empty;
 
+    /// <summary>Whether the credentials email was accepted by the configured mail server.</summary>
+    public bool EmailSent { get; init; }
+
     public string? GradeLevelName { get; init; }
     public string? SectionName { get; init; }
     public DateTime ApprovedAt { get; init; }

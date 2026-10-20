@@ -201,7 +201,10 @@ function IssuedCredentials({ issued, onDismiss }) {
         <KeyRound className="size-5 shrink-0 text-emerald-700" aria-hidden="true" />
         <div className="min-w-0 flex-1">
           <h2 className="font-semibold text-emerald-900">
-            {issued.fullName} is approved as a {issued.requestedRole.toLowerCase()} — credentials emailed to {issued.contactEmail}
+            {issued.fullName} is approved as a {issued.requestedRole.toLowerCase()} —{' '}
+            {issued.emailSent
+              ? `credentials emailed to ${issued.contactEmail}`
+              : 'credentials email failed; share the displayed credentials securely'}
           </h2>
           <p className="mt-1 text-sm text-emerald-800">{issued.message}</p>
 

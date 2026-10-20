@@ -97,7 +97,8 @@ public interface IAccountProvisioningService
     /// <summary>Creates the Identity login and the Teachers row together.</summary>
     Task<ProvisionResult<Teacher>> CreateTeacherAsync(
         ProvisionTeacherRequest request,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        Func<Teacher, string, CancellationToken, Task>? onCreated = null);
 
     /// <summary>Creates a staff login and profile.</summary>
     Task<ProvisionResult<ApplicationUser>> CreateStaffAsync(
@@ -242,7 +243,8 @@ public class AccountProvisioningService : IAccountProvisioningService
 
     public async Task<ProvisionResult<Teacher>> CreateTeacherAsync(
         ProvisionTeacherRequest request,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Func<Teacher, string, CancellationToken, Task>? onCreated = null)
     {
         if (await _userManager.FindByEmailAsync(request.Email) is not null)
         {
@@ -291,6 +293,11 @@ public class AccountProvisioningService : IAccountProvisioningService
             _db.Teachers.Add(teacher);
             await _db.SaveChangesAsync(cancellationToken);
             await LogPhotoPersistenceAsync(userResult.User, cancellationToken);
+
+            if (onCreated is not null)
+            {
+                await onCreated(teacher, request.Email, cancellationToken);
+            }
 
             return ProvisionResult<Teacher>.Ok(teacher, generatedPassword);
         }, request.Email, cancellationToken);
