@@ -96,4 +96,3 @@ GitHub: @degifetise
 This project is open-source and available under the MIT License.
 
 
-<FollowUp>How does this README look for your repository, and would you like to add any specific deployment badges or additional sections?</FollowUp>
