@@ -72,13 +72,14 @@ public class RegistrationRequestsController : ControllerBase
     }
 
     /// <summary>
-    /// Approves an application: generates the student number and the school sign-in address,
-    /// creates the login and the student record, and marks the request Approved.
+    /// Approves an application, creates its login and profile, emails the credentials to the
+    /// applicant, and marks the request Approved.
     ///
-    /// The temporary password is in this response and nowhere else. It is stored only as a hash,
-    /// so it cannot be shown again.
+    /// The temporary password is returned once to the administrator and emailed to the applicant.
+    /// It is stored only as a hash, so it cannot be shown again.
     /// </summary>
     [HttpPost("{id:int}/approve")]
+    [HttpPost("~/api/admin/approve-registration/{id:int}")]
     [ProducesResponseType<ApprovedRegistrationResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

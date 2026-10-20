@@ -179,6 +179,7 @@ builder.Services.AddScoped<IReportPdfService, ReportPdfService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IPasswordResetService, PasswordResetService>();
 builder.Services.AddScoped<IEmailSender, SendGridEmailSender>();
+builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 builder.Services.AddScoped<IEventService, EventService>();
 builder.Services.AddSingleton<ILessonFileStorage, LessonFileStorage>();

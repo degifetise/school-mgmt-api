@@ -14,6 +14,7 @@ public record ProvisionStudentRequest
 {
     /// <summary>Leave blank to generate a compliant temporary password.</summary>
     public string? Password { get; init; }
+    public string? Email { get; init; }
     public string FullName { get; init; } = string.Empty;
     public int GradeLevelId { get; init; }
     public int SectionId { get; init; }
@@ -188,7 +189,9 @@ public class AccountProvisioningService : IAccountProvisioningService
         return await ExecuteInTransactionAsync(async () =>
         {
             var studentIdNumber = await GenerateSequenceAsync("sms", cancellationToken);
-            var email = $"{studentIdNumber}@{_provisioning.StudentEmailDomain}".ToLowerInvariant();
+            var email = string.IsNullOrWhiteSpace(request.Email)
+                ? $"{studentIdNumber}@{_provisioning.StudentEmailDomain}".ToLowerInvariant()
+                : request.Email.Trim();
 
             if (await _userManager.FindByEmailAsync(email) is not null)
             {
@@ -442,25 +445,24 @@ public class AccountProvisioningService : IAccountProvisioningService
 
     public string GenerateTemporaryPassword()
     {
-        // One character from each required class, then padded to 12 and shuffled so the
-        // required characters are not always in the same position.
+        // Keep a symbol first while shuffling the remaining required character classes.
         var characters = new List<char>
         {
-            PasswordUpper[RandomNumberGenerator.GetInt32(PasswordUpper.Length)],
-            PasswordLower[RandomNumberGenerator.GetInt32(PasswordLower.Length)],
-            PasswordDigits[RandomNumberGenerator.GetInt32(PasswordDigits.Length)],
             PasswordSymbols[RandomNumberGenerator.GetInt32(PasswordSymbols.Length)]
         };
 
         const string pool = PasswordUpper + PasswordLower + PasswordDigits + PasswordSymbols;
+        characters.Add(PasswordUpper[RandomNumberGenerator.GetInt32(PasswordUpper.Length)]);
+        characters.Add(PasswordLower[RandomNumberGenerator.GetInt32(PasswordLower.Length)]);
+        characters.Add(PasswordDigits[RandomNumberGenerator.GetInt32(PasswordDigits.Length)]);
         while (characters.Count < 12)
         {
             characters.Add(pool[RandomNumberGenerator.GetInt32(pool.Length)]);
         }
 
-        for (var i = characters.Count - 1; i > 0; i--)
+        for (var i = characters.Count - 1; i > 1; i--)
         {
-            var swap = RandomNumberGenerator.GetInt32(i + 1);
+            var swap = RandomNumberGenerator.GetInt32(1, i + 1);
             (characters[i], characters[swap]) = (characters[swap], characters[i]);
         }
 

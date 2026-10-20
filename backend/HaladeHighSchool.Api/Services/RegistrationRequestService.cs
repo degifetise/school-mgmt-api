@@ -7,6 +7,7 @@ using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using System.Data;
+using System.Globalization;
 
 namespace HaladeHighSchool.Api.Services;
 
@@ -79,7 +80,7 @@ public class RegistrationRequestService : IRegistrationRequestService
     private readonly ApplicationDbContext _db;
     private readonly IAccountProvisioningService _provisioning;
     private readonly UserManager<ApplicationUser> _userManager;
-    private readonly IEmailSender _emailSender;
+    private readonly IEmailService _emailService;
     private readonly ILogger<RegistrationRequestService> _logger;
     private readonly IProfilePhotoStorage _photoStorage;
 
@@ -87,14 +88,14 @@ public class RegistrationRequestService : IRegistrationRequestService
         ApplicationDbContext db,
         IAccountProvisioningService provisioning,
         UserManager<ApplicationUser> userManager,
-        IEmailSender emailSender,
+        IEmailService emailService,
         ILogger<RegistrationRequestService> logger,
         IProfilePhotoStorage photoStorage)
     {
         _db = db;
         _provisioning = provisioning;
         _userManager = userManager;
-        _emailSender = emailSender;
+        _emailService = emailService;
         _logger = logger;
         _photoStorage = photoStorage;
     }
@@ -409,6 +410,7 @@ public class RegistrationRequestService : IRegistrationRequestService
                 new ProvisionStudentRequest
                 {
                     FullName = request.FullName,
+                    Email = $"sms-2026-{request.Id.ToString("D4", CultureInfo.InvariantCulture)}@education.edu",
                     GradeLevelId = request.GradeLevelId!.Value,
                     SectionId = request.SectionId!.Value,
                     PhotoUrl = request.PhotoUrl,
@@ -481,48 +483,42 @@ public class RegistrationRequestService : IRegistrationRequestService
             EmployeeId = teacher?.EmployeeId,
             IssuedEmail = issuedEmail,
             ContactEmail = request.ContactEmail,
-            // Always set here: the provisioning call above never supplies a password of its own.
+            // Provisioning returns only a generated password; Identity stores its hash.
             TemporaryPassword = studentProvisioned?.TemporaryPassword ?? teacherProvisioned?.TemporaryPassword ?? string.Empty,
             GradeLevelName = request.GradeLevel?.Name,
             SectionName = request.Section?.Name,
             ApprovedAt = request.ReviewedAt!.Value,
             Message =
-                $"Send these to {request.ContactEmail}. The temporary password is shown once and "
-              + "cannot be retrieved again; the new account holder should change it after signing in.",
+                $"Credentials were emailed to {request.ContactEmail}. The temporary password is shown once "
+              + "and cannot be retrieved again; the new account holder should change it after signing in.",
         };
 
         try
         {
-            var recipient = !string.IsNullOrWhiteSpace(request.ContactEmail)
-                ? request.ContactEmail
-                : issuedEmail;
-
-            var roleLabel = request.RequestedRole == "Teacher" ? "teacher" : "student";
-            var bodyPlain =
-                $"Hello {request.FullName},\n\n" +
-                $"Your School Management System {roleLabel} account has been approved.\n\n" +
-                $"Sign-in email: {issuedEmail}\n" +
-                $"Temporary password: {approvedResponse.TemporaryPassword}\n\n" +
-                "Please sign in and change your password immediately.";
-
-            var bodyHtml =
-                $"<p>Hello {System.Net.WebUtility.HtmlEncode(request.FullName)},</p>" +
-                $"<p>Your School Management System {roleLabel} account has been approved.</p>" +
-                $"<p><strong>Sign-in email:</strong> {System.Net.WebUtility.HtmlEncode(issuedEmail)}</p>" +
-                $"<p><strong>Temporary password:</strong> {System.Net.WebUtility.HtmlEncode(approvedResponse.TemporaryPassword)}</p>" +
-                "<p>Please sign in and change your password immediately.</p>";
-
-            if (!string.IsNullOrWhiteSpace(recipient))
+            if (isTeacher)
             {
-                await _emailSender.SendEmailAsync(recipient, "Your School Management System account is ready", bodyHtml, bodyPlain, cancellationToken);
+                await _emailService.SendTeacherApprovalEmailAsync(
+                    request.ContactEmail,
+                    request.FullName,
+                    approvedResponse.TemporaryPassword);
+            }
+            else
+            {
+                await _emailService.SendStudentApprovalEmailAsync(
+                    request.ContactEmail,
+                    request.FullName,
+                    issuedEmail,
+                    approvedResponse.TemporaryPassword);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex,
+            _logger.LogError(
+                ex,
                 "Approval email failed for registration request {RequestId} ({Role})",
                 request.Id,
                 request.RequestedRole);
+            throw;
         }
 
         return RegistrationResult<ApprovedRegistrationResponse>.Ok(approvedResponse);

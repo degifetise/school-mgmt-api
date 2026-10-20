@@ -63,8 +63,8 @@ Authorization: Bearer {{token}}
 GET {{HaladeHighSchool.Api_HostAddress}}/api/students/summary
 Authorization: Bearer {{token}}
 
-### Approve a pending student registration (replace 1 with a pending request ID)
-POST {{HaladeHighSchool.Api_HostAddress}}/api/admin/approve-student/1
+### Approve a pending student or teacher registration and email its credentials
+POST {{HaladeHighSchool.Api_HostAddress}}/api/admin/approve-registration/1
 Authorization: {{token}}
 Content-Type: application/json
 
