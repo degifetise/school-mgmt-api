@@ -84,22 +84,48 @@ public class RegistrationRequestsController : ControllerBase
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<ApprovedRegistrationResponse>> Approve(
         int id,
         ReviewRegistrationRequest? request,
         CancellationToken cancellationToken)
     {
-        var reviewerId = User.GetUserId();
-        if (reviewerId is null)
+        try
         {
-            return Unauthorized();
+            var reviewerId = User.GetUserId();
+            if (reviewerId is null)
+            {
+                return Unauthorized();
+            }
+
+            var result = await _registrations.ApproveAsync(id, request?.Note, reviewerId, cancellationToken);
+
+            return result.Succeeded && result.Value is not null
+                ? Ok(result.Value)
+                : Problem(result);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            var traceId = HttpContext.TraceIdentifier;
+            _logger.LogError(
+                ex,
+                "Unexpected failure while approving registration request {RequestId}. TraceId: {TraceId}",
+                id,
+                traceId);
 
-        var result = await _registrations.ApproveAsync(id, request?.Note, reviewerId, cancellationToken);
-
-        return result.Succeeded && result.Value is not null
-            ? Ok(result.Value)
-            : Problem(result);
+            return StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetails
+            {
+                Title = "Registration approval failed",
+                Detail = $"An unexpected error occurred. Provide reference ID {traceId} to support.",
+                Status = StatusCodes.Status500InternalServerError,
+                Instance = HttpContext.Request.Path,
+                Extensions = { ["traceId"] = traceId },
+            });
+        }
     }
 
     /// <summary>

@@ -6,10 +6,12 @@ public interface IEmailService
         string toEmail,
         string fullName,
         string generatedSchoolEmail,
-        string tempPassword);
+        string tempPassword,
+        CancellationToken cancellationToken = default);
 
     Task SendTeacherApprovalEmailAsync(
         string toEmail,
         string fullName,
-        string registeredPassword);
+        string registeredPassword,
+        CancellationToken cancellationToken = default);
 }
