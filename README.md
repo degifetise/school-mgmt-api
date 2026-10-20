@@ -32,6 +32,17 @@ A modern, full-stack school administration and student management platform desig
 
 ## ⚙️ Getting Started & Local Setup
 
+For approval email delivery, configure these environment variables on the API host. Keep the
+Gmail App Password in the host's secret environment-variable store; never commit it to source control:
+
+```text
+EmailSettings__SmtpServer=smtp.gmail.com
+EmailSettings__Port=587
+EmailSettings__SenderEmail=your-sender@gmail.com
+EmailSettings__SenderName=School Administration
+EmailSettings__Password=your-google-app-password
+```
+
 ### Prerequisites
 * [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) installed on your machine.
 * [Node.js (v18 or higher)](https://nodejs.org/) installed for the frontend.

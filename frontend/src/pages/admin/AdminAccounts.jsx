@@ -167,9 +167,8 @@ function NewStaffForm({ onCreated, onError }) {
 }
 
 /**
- * The credentials an approval issued. Kept on screen until dismissed rather than shown as a
- * passing toast: the temporary password is not stored in readable form, so if it is lost here
- * the only way back is a password reset.
+ * The credentials an approval issued. Kept on screen until dismissed; the credentials are also
+ * emailed automatically to the applicant.
  */
 function IssuedCredentials({ issued, onDismiss }) {
   const [copied, setCopied] = useState(false);
@@ -202,7 +201,7 @@ function IssuedCredentials({ issued, onDismiss }) {
         <KeyRound className="size-5 shrink-0 text-emerald-700" aria-hidden="true" />
         <div className="min-w-0 flex-1">
           <h2 className="font-semibold text-emerald-900">
-            {issued.fullName} is approved as a {issued.requestedRole.toLowerCase()} — send these credentials now
+            {issued.fullName} is approved as a {issued.requestedRole.toLowerCase()} — credentials emailed to {issued.contactEmail}
           </h2>
           <p className="mt-1 text-sm text-emerald-800">{issued.message}</p>
 
@@ -446,8 +445,7 @@ export default function AdminAccounts() {
     setError(null);
     try {
       if (approve) {
-        // The response carries the only copy of the temporary password, so it goes to the
-        // credentials panel rather than a notice that can be missed.
+        // Keep the one-time credentials visible to the administrator after the email is sent.
         setIssued(await registrationApi.approve(row.id, note));
         setNotice(null);
       } else {
@@ -457,6 +455,9 @@ export default function AdminAccounts() {
       await loadQueue();
     } catch (err) {
       setError(err.friendlyMessage ?? extractErrorMessage(err));
+      if (approve) {
+        await loadQueue();
+      }
     } finally {
       setBusyId(null);
     }
@@ -519,7 +520,7 @@ export default function AdminAccounts() {
               )}
             </h2>
             <p className="text-sm text-slate-500">
-              Approving issues a student number, a school sign-in address and a temporary password.
+              Approval creates an account and emails its sign-in credentials to the applicant.
             </p>
           </div>
 
