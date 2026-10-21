@@ -1,0 +1,29 @@
+@baseUrl = http://localhost:5006
+@accessToken = replace-with-admin-access-token
+@userId = replace-with-user-id
+
+### List all users and their roles/status
+GET {{baseUrl}}/api/admin/users
+Authorization: Bearer {{accessToken}}
+
+### Promote an existing account to Admin
+POST {{baseUrl}}/api/admin/users/{{userId}}/promote
+Authorization: Bearer {{accessToken}}
+
+### Deactivate an account
+PATCH {{baseUrl}}/api/admin/users/{{userId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "isActive": false
+}
+
+### Activate an account
+PATCH {{baseUrl}}/api/admin/users/{{userId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "isActive": true
+}

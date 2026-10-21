@@ -15,6 +15,7 @@ import {
   UsersRound,
   IdCard,
   ScanLine,
+  UserCog,
 } from 'lucide-react';
 import { ROLES } from '../../context/AuthContext';
 
@@ -114,6 +115,13 @@ const NAV_ITEMS = [
     label: 'Accounts',
     icon: ClipboardCheck,
     description: 'Registration approvals and account provisioning',
+    roles: [ROLES.admin],
+  },
+  {
+    to: '/admin/users',
+    label: 'Users',
+    icon: UserCog,
+    description: 'Manage portal accounts, administrator access and status',
     roles: [ROLES.admin],
   },
   {

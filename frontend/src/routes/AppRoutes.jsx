@@ -14,6 +14,7 @@ const AdminStudents = lazy(() => import('../pages/admin/AdminStudents'));
 const AdminAttendance = lazy(() => import('../pages/admin/AdminAttendance'));
 const AdminAssessments = lazy(() => import('../pages/admin/AdminAssessments'));
 const AdminAccounts = lazy(() => import('../pages/admin/AdminAccounts'));
+const AdminUsers = lazy(() => import('../pages/admin/AdminUsers'));
 const TeacherStudents = lazy(() => import('../pages/teacher/TeacherStudents'));
 const EnterMarks = lazy(() => import('../pages/teacher/EnterMarks'));
 const MyResults = lazy(() => import('../pages/student/MyResults'));
@@ -69,6 +70,7 @@ export default function AppRoutes() {
             <Route path="/admin/attendance" element={<AdminAttendance />} />
             <Route path="/admin/assessments" element={<AdminAssessments />} />
             <Route path="/admin/accounts" element={<AdminAccounts />} />
+            <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/admin/subjects" element={<SubjectManagementPage />} />
             <Route path="/admin/assignments" element={<TeacherAssignments />} />
             <Route path="/admin/feedback" element={<AdminFeedback />} />

@@ -29,6 +29,7 @@ import { API_BASE_URL } from '../../services/api';
 
 const ADMIN_ITEMS = [
   { to: '/admin/analytics', label: 'Dashboard overview', Icon: LayoutDashboard },
+  { to: '/admin/users', label: 'User management', Icon: Users },
   { to: '/admin/students', label: 'Student management', Icon: GraduationCap },
   { to: '/admin/accounts', label: 'Teacher & staff management', Icon: UserRoundCog },
   { to: '/admin/smart-id/print', label: 'Smart ID management & batch print', Icon: IdCard },
