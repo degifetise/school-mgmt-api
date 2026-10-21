@@ -144,10 +144,18 @@ builder.Services
 builder.Services.AddAuthorization();
 
 
+
+
+// Read from Render environment variable, or fall back to localhost for development
+var frontendEnv = Environment.GetEnvironmentVariable("FRONTEND_URL");
+var allowedOrigins = !string.IsNullOrWhiteSpace(frontendEnv)
+    ? frontendEnv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+    : new[] { "http://localhost:5173", "http://127.0.0.1:5173" };
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowVercelFrontend", policy => policy
-        .WithOrigins("https://school-mgmt-api.vercel.app", "http://localhost:5173")
+        .WithOrigins(allowedOrigins)
         .AllowAnyHeader()
         .AllowAnyMethod()
         .WithExposedHeaders("X-Token-Expired", "Content-Disposition")
