@@ -260,47 +260,52 @@ public class EventService : IEventService
 
     private async Task<EventRegistrationDto> RegisterCoreAsync(int eventId, int studentId, CancellationToken cancellationToken)
     {
-        await using var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
-        var eventEntity = await _db.Events.Include(e => e.Registrations)
-            .FirstOrDefaultAsync(e => e.Id == eventId && !e.IsDeleted, cancellationToken)
-            ?? throw new EventServiceException("Event was not found.", StatusCodes.Status404NotFound);
-
-        if (!await _db.Students.AnyAsync(s => s.Id == studentId && s.IsActive, cancellationToken))
-            throw new EventServiceException("Active student was not found.", StatusCodes.Status404NotFound);
-
-        var now = DateTime.UtcNow;
-        if (!eventEntity.IsPublished || eventEntity.IsCancelled || eventEntity.StartsAt <= now)
-            throw new EventServiceException("Registration is closed for this event.", StatusCodes.Status409Conflict);
-        if (eventEntity.RegistrationDeadline.HasValue && eventEntity.RegistrationDeadline.Value < now)
-            throw new EventServiceException("The registration deadline has passed.", StatusCodes.Status409Conflict);
-
-        var existing = eventEntity.Registrations.FirstOrDefault(r => r.StudentId == studentId && r.Status == EventRegistrationStatuses.Confirmed);
-        if (existing is not null)
-            throw new EventServiceException("You are already registered for this event.", StatusCodes.Status409Conflict);
-
-        var currentCount = eventEntity.Registrations.Count(r => r.Status == EventRegistrationStatuses.Confirmed);
-        if (eventEntity.MaxStudents.HasValue && currentCount >= eventEntity.MaxStudents.Value)
-            throw new EventServiceException("Event is full.", StatusCodes.Status400BadRequest);
-
-        // The database keeps one row per event/student. Reuse a cancelled or waitlisted
-        // row instead of inserting a duplicate and violating the unique constraint.
-        var registration = eventEntity.Registrations.FirstOrDefault(r => r.StudentId == studentId);
-        if (registration is null)
+        var strategy = _db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            registration = new EventRegistration { EventId = eventId, StudentId = studentId };
-            _db.EventRegistrations.Add(registration);
-        }
-        else
-        {
-            registration.Status = EventRegistrationStatuses.Confirmed;
-            registration.CancelledAt = null;
-            registration.RegisteredAt = DateTime.UtcNow;
-            registration.AttendanceStatus = EventAttendanceStatuses.Pending;
-        }
+            _db.ClearChangeTracker();
+            await using var transaction = await _db.Database.BeginTransactionAsync(
+                System.Data.IsolationLevel.Serializable,
+                cancellationToken);
+            var eventEntity = await _db.Events.Include(e => e.Registrations)
+                .FirstOrDefaultAsync(e => e.Id == eventId && !e.IsDeleted, cancellationToken)
+                ?? throw new EventServiceException("Event was not found.", StatusCodes.Status404NotFound);
 
-        await _db.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        return _mapper.Map<EventRegistrationDto>(registration);
+            if (!await _db.Students.AnyAsync(s => s.Id == studentId && s.IsActive, cancellationToken))
+                throw new EventServiceException("Active student was not found.", StatusCodes.Status404NotFound);
+
+            var now = DateTime.UtcNow;
+            if (!eventEntity.IsPublished || eventEntity.IsCancelled || eventEntity.StartsAt <= now)
+                throw new EventServiceException("Registration is closed for this event.", StatusCodes.Status409Conflict);
+            if (eventEntity.RegistrationDeadline.HasValue && eventEntity.RegistrationDeadline.Value < now)
+                throw new EventServiceException("The registration deadline has passed.", StatusCodes.Status409Conflict);
+
+            var existing = eventEntity.Registrations.FirstOrDefault(r => r.StudentId == studentId && r.Status == EventRegistrationStatuses.Confirmed);
+            if (existing is not null)
+                throw new EventServiceException("You are already registered for this event.", StatusCodes.Status409Conflict);
+
+            var currentCount = eventEntity.Registrations.Count(r => r.Status == EventRegistrationStatuses.Confirmed);
+            if (eventEntity.MaxStudents.HasValue && currentCount >= eventEntity.MaxStudents.Value)
+                throw new EventServiceException("Event is full.", StatusCodes.Status400BadRequest);
+
+            var registration = eventEntity.Registrations.FirstOrDefault(r => r.StudentId == studentId);
+            if (registration is null)
+            {
+                registration = new EventRegistration { EventId = eventId, StudentId = studentId };
+                _db.EventRegistrations.Add(registration);
+            }
+            else
+            {
+                registration.Status = EventRegistrationStatuses.Confirmed;
+                registration.CancelledAt = null;
+                registration.RegisteredAt = DateTime.UtcNow;
+                registration.AttendanceStatus = EventAttendanceStatuses.Pending;
+            }
+
+            await _db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return _mapper.Map<EventRegistrationDto>(registration);
+        });
     }
 
     public async Task<bool> CancelRegistrationAsync(int eventId, int studentId, CancellationToken cancellationToken = default)

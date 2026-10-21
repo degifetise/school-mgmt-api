@@ -27,19 +27,22 @@ public class StudentsController : PortalControllerBase
     private readonly IAccountProvisioningService _provisioning;
     private readonly IProfilePhotoStorage _photoStorage;
     private readonly ILogger<StudentsController> _logger;
+    private readonly ITokenService _tokens;
 
     public StudentsController(
         ApplicationDbContext db,
         UserManager<ApplicationUser> userManager,
         IAccountProvisioningService provisioning,
         IProfilePhotoStorage photoStorage,
-        ILogger<StudentsController> logger)
+        ILogger<StudentsController> logger,
+        ITokenService tokens)
     {
         _db = db;
         _userManager = userManager;
         _provisioning = provisioning;
         _photoStorage = photoStorage;
         _logger = logger;
+        _tokens = tokens;
     }
 
     /// <summary>Paged, filterable student roster.</summary>
@@ -414,6 +417,7 @@ public class StudentsController : PortalControllerBase
             });
         }
 
+        await _tokens.RevokeAllForUserAsync(user.Id, cancellationToken);
         _logger.LogInformation(
             "Admin {Admin} reset the password for student {StudentIdNumber}",
             User.GetUserId(), student.StudentIdNumber);

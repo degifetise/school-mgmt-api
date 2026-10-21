@@ -52,65 +52,16 @@ public class AuthController : ControllerBase
     {
         var user = await _userManager.FindByEmailAsync(request.Email);
 
-        // The same response for an unknown email and a wrong password, so the endpoint
-        // cannot be used to discover which accounts exist.
         if (user is null)
         {
-            var hasPendingApplication = await _db.StudentRegistrationRequests.AnyAsync(
-                registration => registration.ContactEmail == request.Email
-                    && registration.Status == RegistrationRequestStatus.Pending,
-                cancellationToken);
-
-            if (hasPendingApplication)
-            {
-                return Unauthorized(new ProblemDetails
-                {
-                    Title = "Approval pending",
-                    Detail = "Your account is pending administrator approval.",
-                    Status = StatusCodes.Status401Unauthorized
-                });
-            }
-
-            return Unauthorized(new ProblemDetails
-            {
-                Title = "Invalid credentials",
-                Detail = "The email or password is incorrect.",
-                Status = StatusCodes.Status401Unauthorized
-            });
-        }
-
-        if (!user.IsActive)
-        {
-            /* An applicant awaiting approval has no login at all, so a deactivated account here
-               is always one an administrator switched off. */
-            return Unauthorized(new ProblemDetails
-            {
-                Title = "Account disabled",
-                Detail = "This account has been deactivated. Contact the school administrator.",
-                Status = StatusCodes.Status401Unauthorized
-            });
+            return InvalidCredentials();
         }
 
         var signIn = await _signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
 
-        if (signIn.IsLockedOut)
+        if (!signIn.Succeeded || signIn.IsLockedOut || !user.IsActive)
         {
-            return Unauthorized(new ProblemDetails
-            {
-                Title = "Account locked",
-                Detail = "Too many failed attempts. Try again in 15 minutes.",
-                Status = StatusCodes.Status401Unauthorized
-            });
-        }
-
-        if (!signIn.Succeeded)
-        {
-            return Unauthorized(new ProblemDetails
-            {
-                Title = "Invalid credentials",
-                Detail = "The email or password is incorrect.",
-                Status = StatusCodes.Status401Unauthorized
-            });
+            return InvalidCredentials();
         }
 
         /* UpdateAsync would re-run the Identity user validators - a lookup by user name and
@@ -126,6 +77,14 @@ public class AuthController : ControllerBase
 
         return Ok(response);
     }
+
+    private static UnauthorizedObjectResult InvalidCredentials() =>
+        new(new ProblemDetails
+        {
+            Title = "Invalid credentials",
+            Detail = "The email or password is incorrect.",
+            Status = StatusCodes.Status401Unauthorized
+        });
 
     /// <summary>
     /// Starts a password reset without revealing whether the email belongs to an account.

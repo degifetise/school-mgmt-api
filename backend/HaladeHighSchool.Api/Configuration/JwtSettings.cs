@@ -20,7 +20,7 @@ public class JwtSettings
     public string Audience { get; set; } = string.Empty;
 
     [Range(5, 1440)]
-    public int AccessTokenMinutes { get; set; } = 120;
+    public int AccessTokenMinutes { get; set; } = 15;
 
     [Range(1, 90)]
     public int RefreshTokenDays { get; set; } = 7;

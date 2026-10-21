@@ -9,4 +9,6 @@ public class GradeLevelSection
     public GradeLevel? GradeLevel { get; set; }
 
     public Section? Section { get; set; }
+
+    public ICollection<TeacherSectionAssignment> TeacherAssignments { get; set; } = new List<TeacherSectionAssignment>();
 }

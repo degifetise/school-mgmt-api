@@ -25,6 +25,8 @@ public class Teacher
 
     public ICollection<TeacherSubject> TeacherSubjects { get; set; } = new List<TeacherSubject>();
 
+    public ICollection<TeacherSectionAssignment> SectionAssignments { get; set; } = new List<TeacherSectionAssignment>();
+
     public ICollection<Lesson> Lessons { get; set; } = new List<Lesson>();
 
     public ICollection<Assessment> Assessments { get; set; } = new List<Assessment>();

@@ -63,8 +63,43 @@ public class ReportCardsController : ControllerBase
             return File(linked, "application/pdf", $"report-card-{studentId}.pdf");
         }
 
+        if (User.IsInRole(Roles.Student))
+        {
+            var studentPdf = await _pdfReportCards.GenerateAsync(studentId, cancellationToken);
+            if (studentPdf is null)
+            {
+                return NotFound();
+            }
+
+            return File(studentPdf, "application/pdf", $"report-card-{studentId}.pdf");
+        }
+
         if (User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Teacher))
         {
+            if (User.IsInRole(Roles.Teacher) && !User.IsInRole(Roles.Admin))
+            {
+                var teacherId = User.GetTeacherId();
+                if (teacherId is null)
+                {
+                    return Forbid();
+                }
+
+                var isAssigned = await _db.TeacherSectionAssignments
+                    .AsNoTracking()
+                    .AnyAsync(assignment =>
+                        assignment.TeacherId == teacherId.Value
+                        && _db.Students.Any(student =>
+                            student.Id == studentId
+                            && student.GradeLevelId == assignment.GradeLevelId
+                            && student.SectionId == assignment.SectionId),
+                        cancellationToken);
+
+                if (!isAssigned)
+                {
+                    return Forbid();
+                }
+            }
+
             var pdf = await _pdfReportCards.GenerateAsync(studentId, cancellationToken);
             if (pdf is null)
             {
@@ -74,12 +109,6 @@ public class ReportCardsController : ControllerBase
             return File(pdf, "application/pdf", $"report-card-{studentId}.pdf");
         }
 
-        var genericPdf = await _pdfReportCards.GenerateAsync(studentId, cancellationToken);
-        if (genericPdf is null)
-        {
-            return NotFound();
-        }
-
-        return File(genericPdf, "application/pdf", $"report-card-{studentId}.pdf");
+        return Forbid();
     }
 }

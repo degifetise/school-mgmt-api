@@ -245,7 +245,10 @@ namespace HaladeHighSchool.Api.Migrations
 
                     b.HasIndex("TeacherId");
 
-                    b.ToTable("Assessments", (string)null);
+                    b.ToTable("Assessments", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Assessments_MaxScore_Positive", "\"MaxScore\" > 0");
+                        });
                 });
 
             modelBuilder.Entity("HaladeHighSchool.Api.Models.AssessmentTypeWeight", b =>
@@ -271,7 +274,10 @@ namespace HaladeHighSchool.Api.Migrations
 
                     b.HasKey("Name");
 
-                    b.ToTable("AssessmentTypes", (string)null);
+                    b.ToTable("AssessmentTypes", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_AssessmentTypes_WeightPercentage_Range", "\"WeightPercentage\" >= 0 AND \"WeightPercentage\" <= 100");
+                        });
                 });
 
             modelBuilder.Entity("HaladeHighSchool.Api.Models.Attendance", b =>
@@ -842,6 +848,8 @@ namespace HaladeHighSchool.Api.Migrations
                     b.ToTable("Marks", null, t =>
                         {
                             t.HasTrigger("TR_Marks_Validate");
+
+                            t.HasCheckConstraint("CK_Marks_Score_NonNegative", "\"Score\" >= 0");
                         });
                 });
 
@@ -1002,16 +1010,16 @@ namespace HaladeHighSchool.Api.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("ReplacedByToken")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<DateTime?>("RevokedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Token")
                         .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<string>("UserId")
                         .IsRequired()
@@ -1025,7 +1033,10 @@ namespace HaladeHighSchool.Api.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("RefreshTokens", (string)null);
+                    b.ToTable("RefreshTokens", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_RefreshTokens_Expiry", "\"ExpiresAt\" > \"CreatedAt\"");
+                        });
                 });
 
             modelBuilder.Entity("HaladeHighSchool.Api.Models.Section", b =>
@@ -1129,7 +1140,12 @@ namespace HaladeHighSchool.Api.Migrations
                         .IsUnique()
                         .HasDatabaseName("UQ_SmartCards_UserId");
 
-                    b.ToTable("SmartCards", (string)null);
+                    b.ToTable("SmartCards", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SmartCards_CardType", "\"CardType\" IN ('STUDENT', 'STAFF', 'TEACHER')");
+
+                            t.HasCheckConstraint("CK_SmartCards_Status", "\"Status\" IN ('ACTIVE', 'SUSPENDED', 'LOST', 'EXPIRED')");
+                        });
                 });
 
             modelBuilder.Entity("HaladeHighSchool.Api.Models.SmartIDScanLog", b =>
@@ -1168,7 +1184,10 @@ namespace HaladeHighSchool.Api.Migrations
                     b.HasIndex("ScanTimestamp")
                         .HasDatabaseName("IX_SmartIDScanLogs_ScanTimestamp");
 
-                    b.ToTable("SmartIDScanLogs", (string)null);
+                    b.ToTable("SmartIDScanLogs", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SmartIDScanLogs_ScanStatus", "\"ScanStatus\" IN ('VALID', 'EXPIRED', 'SUSPENDED', 'LOST', 'INVALID', 'NOT_FOUND', 'UID_ONLY')");
+                        });
                 });
 
             modelBuilder.Entity("HaladeHighSchool.Api.Models.Student", b =>
@@ -1585,6 +1604,32 @@ namespace HaladeHighSchool.Api.Migrations
                         .HasFilter("\"UserId\" IS NOT NULL");
 
                     b.ToTable("Teachers", (string)null);
+                });
+
+            modelBuilder.Entity("HaladeHighSchool.Api.Models.TeacherSectionAssignment", b =>
+                {
+                    b.Property<int>("TeacherId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("GradeLevelId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SectionId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("AssignedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.HasKey("TeacherId", "GradeLevelId", "SectionId");
+
+                    b.HasIndex("GradeLevelId", "SectionId");
+
+                    b.HasIndex("TeacherId", "SectionId")
+                        .HasDatabaseName("IX_TeacherSectionAssignments_Teacher_Section");
+
+                    b.ToTable("TeacherSectionAssignments", (string)null);
                 });
 
             modelBuilder.Entity("HaladeHighSchool.Api.Models.TeacherSubject", b =>
@@ -2186,6 +2231,25 @@ namespace HaladeHighSchool.Api.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("HaladeHighSchool.Api.Models.TeacherSectionAssignment", b =>
+                {
+                    b.HasOne("HaladeHighSchool.Api.Models.Teacher", "Teacher")
+                        .WithMany("SectionAssignments")
+                        .HasForeignKey("TeacherId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HaladeHighSchool.Api.Models.GradeLevelSection", "GradeLevelSection")
+                        .WithMany("TeacherAssignments")
+                        .HasForeignKey("GradeLevelId", "SectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("GradeLevelSection");
+
+                    b.Navigation("Teacher");
+                });
+
             modelBuilder.Entity("HaladeHighSchool.Api.Models.TeacherSubject", b =>
                 {
                     b.HasOne("HaladeHighSchool.Api.Models.Section", "Section")
@@ -2308,6 +2372,11 @@ namespace HaladeHighSchool.Api.Migrations
                     b.Navigation("Subjects");
                 });
 
+            modelBuilder.Entity("HaladeHighSchool.Api.Models.GradeLevelSection", b =>
+                {
+                    b.Navigation("TeacherAssignments");
+                });
+
             modelBuilder.Entity("HaladeHighSchool.Api.Models.Guardian", b =>
                 {
                     b.Navigation("StudentGuardians");
@@ -2345,6 +2414,8 @@ namespace HaladeHighSchool.Api.Migrations
                     b.Navigation("Assessments");
 
                     b.Navigation("Lessons");
+
+                    b.Navigation("SectionAssignments");
 
                     b.Navigation("TeacherSubjects");
                 });

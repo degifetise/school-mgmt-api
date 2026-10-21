@@ -130,17 +130,20 @@ public class AccountProvisioningService : IAccountProvisioningService
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ProvisioningSettings _provisioning;
     private readonly ILogger<AccountProvisioningService> _logger;
+    private readonly ISystemSettingsService _settings;
 
     public AccountProvisioningService(
         ApplicationDbContext db,
         UserManager<ApplicationUser> userManager,
         IOptions<ProvisioningSettings> provisioning,
-        ILogger<AccountProvisioningService> logger)
+        ILogger<AccountProvisioningService> logger,
+        ISystemSettingsService settings)
     {
         _db = db;
         _userManager = userManager;
         _provisioning = provisioning.Value;
         _logger = logger;
+        _settings = settings;
     }
 
     public async Task<ProvisionResult<Student>> CreateStudentAsync(
@@ -186,12 +189,13 @@ public class AccountProvisioningService : IAccountProvisioningService
         var generatedPassword = string.IsNullOrWhiteSpace(request.Password)
             ? GenerateTemporaryPassword()
             : null;
+        var academicYear = await _settings.GetAcademicYearAsync(cancellationToken);
 
         return await ExecuteInTransactionAsync(async () =>
         {
             var studentIdNumber = await GenerateSequenceAsync("sms", cancellationToken);
             var email = string.IsNullOrWhiteSpace(request.Email)
-                ? $"{studentIdNumber}@{_provisioning.StudentEmailDomain}".ToLowerInvariant()
+                ? $"{academicYear}-{studentIdNumber}@{_provisioning.StudentEmailDomain}".ToLowerInvariant()
                 : request.Email.Trim();
 
             if (await _userManager.FindByEmailAsync(email) is not null)

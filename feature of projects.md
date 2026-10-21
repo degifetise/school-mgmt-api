@@ -31,7 +31,7 @@ The database schema is maintained through ordered SQL scripts in `database/`. Al
 - Submitting an application creates a **Pending** registration request. It does not sign the applicant in or immediately create an active account.
 - The admin review queue is part of **Admin Accounts** (`/admin/accounts`), rather than a separate `PendingApprovals.jsx` page. Administrators can view pending, approved, and rejected requests and approve or reject pending applications.
 - Approval provisions the account and, for a student request, the student record. The generated student identifier follows `sms-{year}-{four-digit sequence}` (for example, `sms-2026-0001`). The sequence is generated within a serialized database transaction to protect concurrent provisioning.
-- The default generated student sign-in address is `{StudentId}@education.edu` (for example, `sms-2026-0001@education.edu`). The domain is configurable through provisioning settings.
+- The generated student sign-in address uses the active academic year, `StudentIdNumber`, and configured domain (for example, `2026-2027-sms-2026-0001@education.edu`).
 - The applicant's supplied address remains the contact address for delivery of the issued sign-in details. Generated accounts may receive a temporary password; Identity stores password hashes rather than recoverable plaintext passwords.
 - A duplicate pending application for the same contact email is rejected. The request history retains review status and reviewer information.
 

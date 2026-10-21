@@ -10,6 +10,7 @@ const STATUS_STYLE = {
   EXPIRED: 'border-amber-200 bg-amber-50 text-amber-900',
   SUSPENDED: 'border-rose-200 bg-rose-50 text-rose-900',
   LOST: 'border-rose-200 bg-rose-50 text-rose-900',
+  UID_ONLY: 'border-amber-200 bg-amber-50 text-amber-900',
 };
 
 function profilePhotoUrl(photoUrl) {
@@ -109,7 +110,7 @@ export default function SmartIDScannerPage() {
     <div className="mx-auto max-w-4xl space-y-6">
       <header>
         <h1 className="text-xl font-bold text-slate-900">Smart ID verification</h1>
-        <p className="mt-1 text-sm text-slate-600">Scan the QR code or barcode to check card status and record the gate event.</p>
+        <p className="mt-1 text-sm text-slate-600">Scan the signed QR code to verify identity. A barcode UID only confirms that a card record exists.</p>
       </header>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -135,8 +136,8 @@ export default function SmartIDScannerPage() {
           >
             <input
               className="input font-mono"
-              aria-label="Card UID or QR token"
-              placeholder="Enter or paste card UID"
+              aria-label="Card UID or signed QR token"
+              placeholder="Enter or paste card UID or signed QR token"
               value={code}
               onChange={(event) => setCode(event.target.value)}
               maxLength={4096}
@@ -154,7 +155,7 @@ export default function SmartIDScannerPage() {
           {verifying && <p className="text-sm text-slate-500">Verifying scanned card…</p>}
           {!result && !verifying && (
             <div className="grid min-h-52 place-items-center text-center text-sm text-slate-500">
-              <p>Scan a Smart ID or enter its UID to see verification details.</p>
+              <p>Scan a signed Smart ID QR code to verify identity, or look up a barcode UID without revealing student details.</p>
             </div>
           )}
           {result && (
@@ -173,6 +174,12 @@ export default function SmartIDScannerPage() {
                       <img src={photo} alt="" className="size-16 rounded-xl object-cover" />
                     ) : (
                       <span className="grid size-16 place-items-center rounded-xl bg-slate-100 text-xs text-slate-500">No photo</span>
+                    )}
+                    {result.barcodeLookup && (
+                      <dl className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 text-sm">
+                        <div><dt className="text-xs text-slate-500">Card UID</dt><dd className="font-mono">{result.barcodeLookup.cardUID}</dd></div>
+                        <div><dt className="text-xs text-slate-500">Card status</dt><dd>{result.barcodeLookup.cardStatus}</dd></div>
+                      </dl>
                     )}
                     <div className="min-w-0">
                       <h2 className="truncate text-lg font-bold text-slate-900">{card.fullName}</h2>

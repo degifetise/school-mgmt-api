@@ -171,6 +171,7 @@ builder.Services.AddSingleton(serviceProvider =>
 builder.Services.AddScoped<ISystemSettingsService, SystemSettingsService>();
 builder.Services.AddScoped<IGradingPolicyService, GradingPolicyService>();
 builder.Services.AddScoped<ITeachingAssignmentService, TeachingAssignmentService>();
+builder.Services.AddScoped<ITeacherAssignmentService, TeacherAssignmentService>();
 builder.Services.AddScoped<IRegistrationRequestService, RegistrationRequestService>();
 builder.Services.AddScoped<IReportCardService, ReportCardService>();
 builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
