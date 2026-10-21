@@ -36,6 +36,7 @@ function normalizeOklchColors(value, colorContext) {
 
 export function SmartCardFace({ card, side = 'front', faceRef }) {
   const { schoolName, contactEmail, academicYear } = useSchoolInfo();
+  const cardSchoolName = card.schoolName || schoolName;
   const barcodeRef = useRef(null);
   const photo = photoSource(card.photoUrl);
 
@@ -58,32 +59,44 @@ export function SmartCardFace({ card, side = 'front', faceRef }) {
           <span className="rounded-full border border-white/40 px-2 py-1 text-[8px] font-semibold">OFFICIAL</span>
         </div>
         <div className="mt-2 flex min-h-0 flex-1 gap-2">
-          <div className="min-w-0 flex-1 space-y-1.5 text-[9px] leading-tight">
+          <div className="min-w-0 flex-1 space-y-1 text-[8px] leading-tight">
+            <p><strong>User phone</strong><br />{card.phoneNumber || 'Not provided'}</p>
+            <p><strong>Guardian phone</strong><br />{card.guardianPhoneNumber || 'Not provided'}</p>
             <p><strong>Emergency contact</strong><br />{card.emergencyContact || 'Not provided'}</p>
             <p><strong>Blood group</strong><br />{card.bloodGroup || 'Not provided'}</p>
-            <p><strong>Return to</strong><br />{schoolName}{contactEmail ? ` · ${contactEmail}` : ''}</p>
+            <p><strong>Return to</strong><br />{cardSchoolName}{contactEmail ? ` · ${contactEmail}` : ''}</p>
           </div>
           <div className="flex shrink-0 flex-col items-center gap-0.5 rounded bg-white p-1">
             <QRCodeSVG value={card.cardUID} size={54} level="H" marginSize={0} />
             <span className="max-w-12 truncate font-mono text-[6px] text-slate-800">{card.cardUID}</span>
           </div>
-          <div className="flex h-12 w-16 shrink-0 items-end justify-center rounded bg-white/95 p-1">
-            {card.digitalSignatureUrl ? (
-              <img
-                src={photoSource(card.digitalSignatureUrl)}
-                alt="Digital signature"
-                className="max-h-full max-w-full object-contain"
-                crossOrigin="anonymous"
-              />
-            ) : (
-              <span className="text-[8px] text-slate-400">Authorized signature</span>
+          <div className="flex w-20 shrink-0 flex-col items-center gap-0.5">
+            <div className="flex h-12 w-16 items-end justify-center rounded bg-white/95 p-1">
+              {card.digitalSignatureUrl ? (
+                <img
+                  src={photoSource(card.digitalSignatureUrl)}
+                  alt="Digital signature"
+                  className="max-h-full max-w-full object-contain"
+                  crossOrigin="anonymous"
+                />
+              ) : (
+                <span className="text-[8px] text-slate-400">Authorized signature</span>
+              )}
+            </div>
+            <span className="max-w-full truncate text-center text-[7px] font-semibold leading-tight">
+              {card.directorFullName || 'School Director'}
+            </span>
+            {card.directorTitle && (
+              <span className="max-w-full truncate text-center text-[6px] leading-tight text-white/75">
+                {card.directorTitle}
+              </span>
             )}
           </div>
         </div>
         <div className="mt-1 flex items-end justify-between gap-2 border-t border-white/20 pt-1">
           <svg ref={barcodeRef} className="h-5 max-w-28 bg-white px-1" aria-label={`Barcode ${card.cardUID}`} />
           <p className="max-w-[45%] text-right text-[7px] leading-tight text-white/80">
-            This card remains the property of {schoolName}. If found, return it to the school office.
+            This card remains the property of {cardSchoolName}. If found, return it to the school office.
             Possession and access are subject to verification.
           </p>
         </div>
@@ -95,9 +108,9 @@ export function SmartCardFace({ card, side = 'front', faceRef }) {
     <article ref={faceRef} className="smart-id-card-face smart-id-card-front" aria-label={`${card.fullName} ID card front`}>
       <header className="flex items-center gap-2 border-b border-white/20 pb-1.5">
         <span className="grid size-7 shrink-0 place-items-center rounded-full bg-white/15 text-[10px] font-bold" aria-hidden="true">
-          {schoolName.slice(0, 1).toUpperCase()}
+          {cardSchoolName.slice(0, 1).toUpperCase()}
         </span>
-        <span className="min-w-0 flex-1 truncate text-[10px] font-bold uppercase tracking-wide">{schoolName}</span>
+        <span className="min-w-0 flex-1 truncate text-[10px] font-bold uppercase tracking-wide">{cardSchoolName}</span>
         <span className="rounded bg-white/15 px-1.5 py-1 text-[8px] font-semibold uppercase">{card.role}</span>
       </header>
       <div className="flex min-h-0 flex-1 gap-2.5 pt-2">

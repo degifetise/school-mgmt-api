@@ -86,6 +86,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.Property(card => card.QrTokenHash).HasMaxLength(512).IsRequired();
             entity.Property(card => card.CardType).HasMaxLength(20).IsRequired();
             entity.Property(card => card.Status).HasMaxLength(20).HasDefaultValue("ACTIVE").IsRequired();
+            entity.Property(card => card.SchoolName).HasMaxLength(200);
+            entity.Property(card => card.DirectorFullName).HasMaxLength(150);
+            entity.Property(card => card.DirectorTitle).HasMaxLength(100);
             entity.Property(card => card.IssuedDate).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(card => card.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.HasIndex(card => card.UserId).IsUnique().HasDatabaseName("UQ_SmartCards_UserId");
@@ -155,6 +158,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.Property(u => u.ProfileImageUrl).HasMaxLength(500);
             entity.Property(u => u.PhotoUrl).HasMaxLength(500);
             entity.Property(u => u.DigitalSignatureUrl).HasMaxLength(500);
+            entity.Property(u => u.GuardianPhoneNumber).HasMaxLength(32);
+            entity.Property(u => u.EmergencyContactNumber).HasMaxLength(32);
+            entity.Property(u => u.BloodGroup).HasMaxLength(10);
             entity.Property(u => u.IsActive).HasDefaultValue(true);
             entity.Property(u => u.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.HasIndex(u => u.IsActive).HasDatabaseName("IX_AspNetUsers_IsActive");

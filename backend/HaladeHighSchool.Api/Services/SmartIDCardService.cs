@@ -9,13 +9,16 @@ public sealed class SmartIDCardService
 {
     private readonly ApplicationDbContext _db;
     private readonly SmartIDTokenKeyProtector _tokenKeyProtector;
+    private readonly ISystemSettingsService _settings;
 
     public SmartIDCardService(
         ApplicationDbContext db,
-        SmartIDTokenKeyProtector tokenKeyProtector)
+        SmartIDTokenKeyProtector tokenKeyProtector,
+        ISystemSettingsService settings)
     {
         _db = db;
         _tokenKeyProtector = tokenKeyProtector;
+        _settings = settings;
     }
 
     public async Task<SmartCard> AddCardAsync(
@@ -70,6 +73,7 @@ public sealed class SmartIDCardService
             throw new InvalidOperationException("The Smart ID token key could not be protected.");
         }
 
+        var schoolInfo = await _settings.GetSchoolInfoAsync(cancellationToken);
         var card = new SmartCard
         {
             UserId = user.Id,
@@ -77,6 +81,7 @@ public sealed class SmartIDCardService
             QrTokenHash = protectedKey,
             CardType = cardType,
             Status = "ACTIVE",
+            SchoolName = schoolInfo.SchoolName,
             IssuedDate = DateTime.UtcNow,
             ExpirationDate = DateTime.UtcNow.AddYears(5),
             CreatedAt = DateTime.UtcNow
