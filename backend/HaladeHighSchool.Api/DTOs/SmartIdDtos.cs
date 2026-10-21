@@ -72,4 +72,8 @@ public record VerifySmartIDScanResponse
     public bool IsValid { get; init; }
     public string Message { get; init; } = string.Empty;
     public SmartIDCardDetails? Card { get; init; }
+    public SmartIDBarcodeLookupResponse? BarcodeLookup { get; init; }
 }
+
+/// <summary>Minimal, non-identifying response for an unsigned barcode UID lookup.</summary>
+public sealed record SmartIDBarcodeLookupResponse(string CardUID, string CardStatus);

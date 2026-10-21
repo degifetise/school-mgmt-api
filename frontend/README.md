@@ -5,9 +5,7 @@ Lucide React supplies the icons and Framer Motion the transitions.
 
 ## Prerequisites
 
-1. `HaladeHighSchoolDb` created by `database/01_Create_HaladeHighSchoolDb.sql`, then upgraded
-   through the applicable numbered scripts, including `database/16_Smart_ID_System.sql` and
-   `database/17_Registration_Profile_Photos.sql`.
+1. The PostgreSQL schema created by the API's EF Core migrations.
 2. The API running on <http://localhost:5006> (`dotnet run` in `backend/HaladeHighSchool.Api`).
    Its CORS policy whitelists `http://localhost:5173`, so the Vite port is pinned in
    `vite.config.js`; change both together if you move it.
@@ -20,6 +18,9 @@ cp .env.example .env.local   # then edit VITE_API_BASE_URL if the API is elsewhe
 npm run dev                  # http://localhost:5173
 npm run build                # production bundle in dist/
 ```
+
+Production builds require `VITE_API_BASE_URL` to be set to an absolute HTTPS API URL.
+The local `.env.example` value is only for development.
 
 ## Structure
 
@@ -57,8 +58,8 @@ npm run build                # production bundle in dist/
 | `/admin/smart-id/print` | Admin | `POST /api/smart-id/batch-cards` filtered by grade/section or teacher department, photo upload and card status |
 | `/admin/scanner`, `/staff/scanner` | Admin, teacher | `POST /api/smart-id/verify-scan` |
 
-The Smart ID migration adds the card, profile photo, and scan audit schema. Apply it before
-starting the API; on startup, missing cards are issued for existing students, teachers, and
+The EF Core migrations add the card, profile photo, scan audit, and assignment schemas. Apply
+them before starting the API; on startup, missing cards are issued for existing students, teachers, and
 administrators. New cards are issued transactionally with approved registrations and direct
 admin provisioning. Optional JPG/PNG photos (maximum 2 MB) can be attached to public student or
 teacher applications and administrator-created student/teacher accounts. Applicant photos are
@@ -100,8 +101,7 @@ things to a teacher.
 assessments per subject and published marks, all through the API. Development only — the
 passwords in it are well known.
 
-Sign-in details for every seeded account are in [`README_CREDENTIALS.md`](../README_CREDENTIALS.md);
-the API also prints them to its console on start-up when it runs in Development.
+Local account setup is documented in [`README_CREDENTIALS.md`](../README_CREDENTIALS.md).
 
 ## Checking the backend
 

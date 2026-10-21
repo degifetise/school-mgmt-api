@@ -195,7 +195,7 @@ export const gradeLevelApi = {
 };
 
 export const sectionApi = {
-  list: () => unwrap(api.get('/api/sections')),
+  list: (params = {}) => unwrap(api.get('/api/sections', { params })),
 };
 
 export const subjectApi = {
@@ -235,6 +235,14 @@ export const teacherApi = {
     unwrap(api.delete(`/api/teachers/${teacherId}/assignments/${assignmentId}`)),
   reassignAssignment: (assignmentId, teacherId) =>
     unwrap(api.put(`/api/admin/teacher-assignments/${assignmentId}`, { teacherId })),
+  getSectionAssignments: (teacherId) =>
+    unwrap(api.get(`/api/admin/teachers/${teacherId}/assignments`)),
+  assignSections: (teacherId, assignments) =>
+    unwrap(api.post(`/api/admin/teachers/${teacherId}/assignments`, { assignments })),
+  replaceSectionAssignments: (teacherId, assignments) =>
+    unwrap(api.put(`/api/admin/teachers/${teacherId}/assignments`, { assignments })),
+  removeSectionAssignment: (teacherId, sectionId) =>
+    unwrap(api.delete(`/api/admin/teachers/${teacherId}/assignments/${sectionId}`)),
   /** The signed-in teacher's own subject/section assignments. */
   myClasses: () => unwrap(api.get('/api/teachers/me/classes')),
   /** Class list for one of those assignments, with each student's weighted standing. */

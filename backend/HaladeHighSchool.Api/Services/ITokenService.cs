@@ -17,6 +17,9 @@ public interface ITokenService
     /// <summary>Revokes a single refresh token. Returns false when it was not active.</summary>
     Task<bool> RevokeAsync(string refreshToken, CancellationToken cancellationToken = default);
 
+    /// <summary>Revokes every active refresh token for a user after a credential change.</summary>
+    Task RevokeAllForUserAsync(string userId, CancellationToken cancellationToken = default);
+
     /// <summary>Builds the profile payload the frontend stores after login.</summary>
     Task<UserProfileResponse> BuildProfileAsync(ApplicationUser user, CancellationToken cancellationToken = default);
 }

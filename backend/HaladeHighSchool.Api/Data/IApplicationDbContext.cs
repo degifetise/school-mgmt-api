@@ -12,11 +12,13 @@ public interface IApplicationDbContext
     DbSet<ApplicationUser> Users { get; }
     DbSet<Teacher> Teachers { get; }
     DbSet<TeacherSubject> TeacherSubjects { get; }
+    DbSet<TeacherSectionAssignment> TeacherSectionAssignments { get; }
     DbSet<Notification> Notifications { get; }
     DbSet<StudentFeedback> StudentFeedbacks { get; }
     DbSet<EventComment> EventComments { get; }
     DbSet<SmartCard> SmartCards { get; }
     DbSet<SmartIDScanLog> SmartIDScanLogs { get; }
     DatabaseFacade Database { get; }
+    void ClearChangeTracker();
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

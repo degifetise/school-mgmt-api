@@ -773,7 +773,7 @@ public sealed class SmartIDController : PortalControllerBase
         var input = request.Code?.Trim() ?? string.Empty;
         if (input.Length is 0 or > 4096)
         {
-            return BadRequestProblem("Invalid scan", "Provide a valid card UID or Smart ID QR token.");
+            return BadRequestProblem("Invalid scan", "Provide a card UID or signed Smart ID QR token.");
         }
 
         if (request.ScanLocation?.Length > 200)
@@ -786,20 +786,46 @@ public sealed class SmartIDController : PortalControllerBase
         {
             return Unauthorized();
         }
+
+        var isDynamicToken = input.Count(character => character == '.') == 2;
+        if (!isDynamicToken)
+        {
+            var barcodeCard = await _db.SmartCards.AsNoTracking()
+                .FirstOrDefaultAsync(item => item.CardUID == input, cancellationToken);
+            var barcodeStatus = barcodeCard is null ? "NOT_FOUND" : "UID_ONLY";
+
+            _db.SmartIDScanLogs.Add(new SmartIDScanLog
+            {
+                ScannerUserId = scannerUserId,
+                ScanLocation = string.IsNullOrWhiteSpace(request.ScanLocation) ? null : request.ScanLocation.Trim(),
+                ScanTimestamp = DateTime.UtcNow,
+                ScanStatus = barcodeStatus
+            });
+            await _db.SaveChangesAsync(cancellationToken);
+
+            return Ok(new VerifySmartIDScanResponse
+            {
+                Status = barcodeStatus,
+                IsValid = false,
+                Message = barcodeCard is null
+                    ? "No card matches the scanned barcode."
+                    : "Barcode located. Scan the signed QR code to verify the cardholder.",
+                BarcodeLookup = barcodeCard is null
+                    ? null
+                    : new SmartIDBarcodeLookupResponse(barcodeCard.CardUID, ResolveCardStatus(barcodeCard))
+            });
+        }
+
         string? cardUid = input;
         JwtSecurityToken? presentedToken = null;
-        var isDynamicToken = input.Count(character => character == '.') == 2;
-        if (isDynamicToken)
+        try
         {
-            try
-            {
-                presentedToken = new JwtSecurityTokenHandler().ReadJwtToken(input);
-                cardUid = presentedToken.Claims.FirstOrDefault(claim => claim.Type == "card_uid")?.Value;
-            }
-            catch (Exception exception) when (exception is ArgumentException or SecurityTokenException)
-            {
-                cardUid = null;
-            }
+            presentedToken = new JwtSecurityTokenHandler().ReadJwtToken(input);
+            cardUid = presentedToken.Claims.FirstOrDefault(claim => claim.Type == "card_uid")?.Value;
+        }
+        catch (Exception exception) when (exception is ArgumentException or SecurityTokenException)
+        {
+            cardUid = null;
         }
 
         var card = cardUid is null
@@ -811,11 +837,7 @@ public sealed class SmartIDController : PortalControllerBase
         var details = card is null ? null : await FindCardDetailsAsync(card.UserId, cancellationToken);
         var tokenExpired = false;
 
-        if (card is not null && !isDynamicToken)
-        {
-            status = ResolveCardStatus(card);
-        }
-        else if (card is not null && presentedToken is not null)
+        if (card is not null && presentedToken is not null)
         {
             try
             {

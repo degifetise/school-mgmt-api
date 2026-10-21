@@ -17,19 +17,22 @@ public class PasswordResetService : IPasswordResetService
     private readonly IEmailSender _emailSender;
     private readonly EmailSettings _emailSettings;
     private readonly ILogger<PasswordResetService> _logger;
+    private readonly ITokenService _tokens;
 
     public PasswordResetService(
         ApplicationDbContext db,
         UserManager<ApplicationUser> userManager,
         IEmailSender emailSender,
         IOptions<EmailSettings> emailSettings,
-        ILogger<PasswordResetService> logger)
+        ILogger<PasswordResetService> logger,
+        ITokenService tokens)
     {
         _db = db;
         _userManager = userManager;
         _emailSender = emailSender;
         _emailSettings = emailSettings.Value;
         _logger = logger;
+        _tokens = tokens;
     }
 
     public async Task<string?> RequestResetAsync(
@@ -122,6 +125,7 @@ public class PasswordResetService : IPasswordResetService
         request.UsedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(cancellationToken);
         await _userManager.UpdateSecurityStampAsync(request.User);
+        await _tokens.RevokeAllForUserAsync(request.UserId, cancellationToken);
 
         _logger.LogInformation("Password reset completed for user {UserId}", request.UserId);
         return PasswordResetResult.Ok();

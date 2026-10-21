@@ -29,6 +29,7 @@ public class TeachersController : PortalControllerBase
     private readonly IProfilePhotoStorage _photoStorage;
     private readonly ISystemSettingsService _settings;
     private readonly ILogger<TeachersController> _logger;
+    private readonly ITokenService _tokens;
 
     public TeachersController(
         ApplicationDbContext db,
@@ -36,7 +37,8 @@ public class TeachersController : PortalControllerBase
         IAccountProvisioningService provisioning,
         IProfilePhotoStorage photoStorage,
         ISystemSettingsService settings,
-        ILogger<TeachersController> logger)
+        ILogger<TeachersController> logger,
+        ITokenService tokens)
     {
         _db = db;
         _userManager = userManager;
@@ -44,6 +46,7 @@ public class TeachersController : PortalControllerBase
         _photoStorage = photoStorage;
         _settings = settings;
         _logger = logger;
+        _tokens = tokens;
     }
 
     // -----------------------------------------------------------------------
@@ -598,6 +601,7 @@ public class TeachersController : PortalControllerBase
             });
         }
 
+        await _tokens.RevokeAllForUserAsync(user.Id, cancellationToken);
         _logger.LogInformation(
             "Admin {Admin} reset the password for teacher {EmployeeId}", User.GetUserId(), teacher.EmployeeId);
 

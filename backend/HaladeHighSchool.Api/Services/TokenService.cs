@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
+using System.Text;
 using HaladeHighSchool.Api.Configuration;
 using HaladeHighSchool.Api.Data;
 using HaladeHighSchool.Api.DTOs;
@@ -28,14 +29,14 @@ public class TokenService : ITokenService
         CancellationToken cancellationToken = default)
     {
         var profile = await BuildProfileAsync(user, cancellationToken);
-        var expiresAt = DateTime.UtcNow.AddMinutes(_jwt.AccessTokenMinutes);
+        var expiresAt = DateTime.UtcNow.AddMinutes(15);
         var accessToken = CreateAccessToken(user, profile, expiresAt);
         var refreshToken = await IssueRefreshTokenAsync(user.Id, ipAddress, cancellationToken);
 
         return new AuthResponse
         {
             AccessToken = accessToken,
-            RefreshToken = refreshToken.Token,
+            RefreshToken = refreshToken.PlainTextToken,
             ExpiresAt = expiresAt,
             User = profile
         };
@@ -48,7 +49,7 @@ public class TokenService : ITokenService
     {
         var stored = await _db.RefreshTokens
             .Include(t => t.User)
-            .FirstOrDefaultAsync(t => t.Token == refreshToken, cancellationToken);
+            .FirstOrDefaultAsync(t => t.Token == HashRefreshToken(refreshToken), cancellationToken);
 
         if (stored?.User is null || stored.RevokedAt is not null || stored.ExpiresAt <= DateTime.UtcNow)
         {
@@ -63,16 +64,16 @@ public class TokenService : ITokenService
         var replacement = await IssueRefreshTokenAsync(stored.UserId, ipAddress, cancellationToken, saveChanges: false);
 
         stored.RevokedAt = DateTime.UtcNow;
-        stored.ReplacedByToken = replacement.Token;
+        stored.ReplacedByToken = replacement.StoredToken.Token;
         await _db.SaveChangesAsync(cancellationToken);
 
         var profile = await BuildProfileAsync(stored.User, cancellationToken);
-        var expiresAt = DateTime.UtcNow.AddMinutes(_jwt.AccessTokenMinutes);
+        var expiresAt = DateTime.UtcNow.AddMinutes(15);
 
         return new AuthResponse
         {
             AccessToken = CreateAccessToken(stored.User, profile, expiresAt),
-            RefreshToken = replacement.Token,
+            RefreshToken = replacement.PlainTextToken,
             ExpiresAt = expiresAt,
             User = profile
         };
@@ -81,7 +82,7 @@ public class TokenService : ITokenService
     public async Task<bool> RevokeAsync(string refreshToken, CancellationToken cancellationToken = default)
     {
         var stored = await _db.RefreshTokens
-            .FirstOrDefaultAsync(t => t.Token == refreshToken, cancellationToken);
+            .FirstOrDefaultAsync(t => t.Token == HashRefreshToken(refreshToken), cancellationToken);
 
         if (stored is null || stored.RevokedAt is not null)
         {
@@ -91,6 +92,16 @@ public class TokenService : ITokenService
         stored.RevokedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(cancellationToken);
         return true;
+    }
+
+    public async Task RevokeAllForUserAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        await _db.RefreshTokens
+            .Where(token => token.UserId == userId && token.RevokedAt == null && token.ExpiresAt > now)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(token => token.RevokedAt, now),
+                cancellationToken);
     }
 
     /// <summary>
@@ -193,16 +204,17 @@ public class TokenService : ITokenService
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
-    private async Task<RefreshToken> IssueRefreshTokenAsync(
+    private async Task<IssuedRefreshToken> IssueRefreshTokenAsync(
         string userId,
         string? ipAddress,
         CancellationToken cancellationToken,
         bool saveChanges = true)
     {
+        var plainTextToken = Base64UrlEncoder.Encode(RandomNumberGenerator.GetBytes(64));
         var token = new RefreshToken
         {
             UserId = userId,
-            Token = Base64UrlEncoder.Encode(RandomNumberGenerator.GetBytes(64)),
+            Token = HashRefreshToken(plainTextToken),
             CreatedAt = DateTime.UtcNow,
             ExpiresAt = DateTime.UtcNow.AddDays(_jwt.RefreshTokenDays),
             CreatedByIp = ipAddress
@@ -215,6 +227,11 @@ public class TokenService : ITokenService
             await _db.SaveChangesAsync(cancellationToken);
         }
 
-        return token;
+        return new IssuedRefreshToken(token, plainTextToken);
     }
+
+    private static string HashRefreshToken(string token) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))).ToLowerInvariant();
+
+    private sealed record IssuedRefreshToken(RefreshToken StoredToken, string PlainTextToken);
 }

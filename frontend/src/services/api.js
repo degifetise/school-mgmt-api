@@ -1,6 +1,23 @@
 import axios from 'axios';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5006';
+const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+if (import.meta.env.PROD && !configuredBaseUrl) {
+  throw new Error('VITE_API_BASE_URL must be configured for production builds.');
+}
+
+const BASE_URL = configuredBaseUrl || 'http://localhost:5006';
+if (configuredBaseUrl) {
+  let parsedBaseUrl;
+  try {
+    parsedBaseUrl = new URL(configuredBaseUrl);
+  } catch {
+    throw new Error('VITE_API_BASE_URL must be an absolute HTTP(S) URL.');
+  }
+  if (!['http:', 'https:'].includes(parsedBaseUrl.protocol)
+      || (import.meta.env.PROD && parsedBaseUrl.protocol !== 'https:')) {
+    throw new Error('VITE_API_BASE_URL must use HTTPS in production.');
+  }
+}
 export const API_BASE_URL = BASE_URL;
 
 export const STORAGE_KEYS = {
@@ -128,7 +145,7 @@ api.interceptors.response.use(
       return Promise.reject(
         Object.assign(error, {
           friendlyMessage:
-            'Cannot reach the server. Check that the API is running on ' + BASE_URL + '.',
+"This can take up to 30 seconds on the first load—please wait a moment and try again.",
         }),
       );
     }

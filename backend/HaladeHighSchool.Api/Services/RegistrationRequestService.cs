@@ -410,7 +410,7 @@ public class RegistrationRequestService : IRegistrationRequestService
                 new ProvisionStudentRequest
                 {
                     FullName = request.FullName,
-                    Email = $"sms-2026-{request.Id.ToString("D4", CultureInfo.InvariantCulture)}@education.edu",
+                    Email = null,
                     GradeLevelId = request.GradeLevelId!.Value,
                     SectionId = request.SectionId!.Value,
                     PhotoUrl = request.PhotoUrl,

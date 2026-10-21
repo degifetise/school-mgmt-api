@@ -27,8 +27,8 @@ public record PasswordChangeResult
 public interface IAccountService
 {
     /// <summary>
-    /// Changes the signed-in user's password and records the attempt. Touches the password hash
-    /// and nothing else: no email, user name, role or claim is read from the caller.
+    /// Changes the signed-in user's password, revokes existing refresh tokens and records the
+    /// attempt. No email, user name, role or claim is read from the caller.
     /// </summary>
     Task<PasswordChangeResult> ChangePasswordAsync(
         ApplicationUser user,
@@ -43,15 +43,18 @@ public class AccountService : IAccountService
     private readonly ApplicationDbContext _db;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ILogger<AccountService> _logger;
+    private readonly ITokenService _tokens;
 
     public AccountService(
         ApplicationDbContext db,
         UserManager<ApplicationUser> userManager,
-        ILogger<AccountService> logger)
+        ILogger<AccountService> logger,
+        ITokenService tokens)
     {
         _db = db;
         _userManager = userManager;
         _logger = logger;
+        _tokens = tokens;
     }
 
     public async Task<PasswordChangeResult> ChangePasswordAsync(
@@ -69,6 +72,7 @@ public class AccountService : IAccountService
 
         if (result.Succeeded)
         {
+            await _tokens.RevokeAllForUserAsync(user.Id, cancellationToken);
             var log = await WriteLogAsync(user.Id, PasswordChangeOutcome.Succeeded, null, context, cancellationToken);
 
             _logger.LogInformation("Password changed for {UserId}", user.Id);

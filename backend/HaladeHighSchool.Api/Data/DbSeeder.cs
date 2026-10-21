@@ -29,7 +29,7 @@ public static class DbSeeder
 
         var accounts = new List<SeededAccount>();
 
-        if (await SeedAdminAsync(userManager, configuration, logger) is { } admin)
+        if (await SeedAdminAsync(userManager, configuration, environment, logger) is { } admin)
         {
             accounts.Add(admin);
         }
@@ -63,15 +63,24 @@ public static class DbSeeder
     private static async Task<SeededAccount?> SeedAdminAsync(
         UserManager<ApplicationUser> userManager,
         IConfiguration configuration,
+        IHostEnvironment environment,
         ILogger logger)
     {
-        var email = configuration["SeedAdmin:Email"];
-        var password = configuration["SeedAdmin:Password"];
-        var fullName = configuration["SeedAdmin:FullName"] ?? "System Administrator";
+        var email = Environment.GetEnvironmentVariable("AdminSettings__Email");
+        var password = Environment.GetEnvironmentVariable("AdminSettings__Password");
+        var fullName = configuration["AdminSettings:FullName"] ?? "System Administrator";
 
         if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
         {
-            logger.LogWarning("SeedAdmin configuration is missing; no administrator was created.");
+            if (environment.IsProduction())
+            {
+                logger.LogCritical(
+                    "Administrator seeding credentials are missing in Production; startup cannot continue securely.");
+                throw new InvalidOperationException(
+                    "AdminSettings__Email and AdminSettings__Password environment variables are required in Production.");
+            }
+
+            logger.LogWarning("Administrator environment variables are missing; no administrator was created.");
             return null;
         }
 

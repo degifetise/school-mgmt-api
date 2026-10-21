@@ -7,7 +7,7 @@ public class ProvisioningSettings
     public const string SectionName = "Provisioning";
 
     /// <summary>
-    /// Domain for generated student sign-in addresses, e.g. sms-2026-0007@education.edu.
+    /// Domain for generated student sign-in addresses, e.g. 2026-2027-SMS-2026-0007@education.edu.
     /// The applicant's own address stays on their registration request as contact detail.
     /// </summary>
     [Required]

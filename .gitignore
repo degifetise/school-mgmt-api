@@ -1,5 +1,5 @@
 # Node.js / frontend build output
-node_modules/
+**/node_modules/
 dist/
 build/
 .vite/
@@ -36,6 +36,7 @@ TestResults/
 # User uploads (keep the directory placeholder)
 uploads/*
 !uploads/.gitkeep
+**/wwwroot/uploads/
 
 # Editor and operating-system files
 .DS_Store

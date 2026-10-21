@@ -12,6 +12,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
     {
     }
 
+    public void ClearChangeTracker() => ChangeTracker.Clear();
+
     public DbSet<GradeLevel> GradeLevels => Set<GradeLevel>();
     public DbSet<Section> Sections => Set<Section>();
     public DbSet<GradeLevelSection> GradeLevelSections => Set<GradeLevelSection>();
@@ -21,6 +23,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
     public DbSet<Guardian> Guardians => Set<Guardian>();
     public DbSet<StudentGuardian> StudentGuardians => Set<StudentGuardian>();
     public DbSet<TeacherSubject> TeacherSubjects => Set<TeacherSubject>();
+    public DbSet<TeacherSectionAssignment> TeacherSectionAssignments => Set<TeacherSectionAssignment>();
     public DbSet<Lesson> Lessons => Set<Lesson>();
     public DbSet<Assessment> Assessments => Set<Assessment>();
     public DbSet<AssessmentTypeWeight> AssessmentTypeWeights => Set<AssessmentTypeWeight>();
@@ -67,7 +70,15 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
     {
         builder.Entity<SmartCard>(entity =>
         {
-            entity.ToTable("SmartCards");
+            entity.ToTable("SmartCards", table =>
+            {
+                table.HasCheckConstraint(
+                    "CK_SmartCards_CardType",
+                    "\"CardType\" IN ('STUDENT', 'STAFF', 'TEACHER')");
+                table.HasCheckConstraint(
+                    "CK_SmartCards_Status",
+                    "\"Status\" IN ('ACTIVE', 'SUSPENDED', 'LOST', 'EXPIRED')");
+            });
             entity.HasKey(card => card.CardId);
             entity.Property(card => card.CardId).HasDefaultValueSql("gen_random_uuid()");
             entity.Property(card => card.UserId).HasMaxLength(450).IsRequired();
@@ -87,7 +98,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
 
         builder.Entity<SmartIDScanLog>(entity =>
         {
-            entity.ToTable("SmartIDScanLogs");
+            entity.ToTable("SmartIDScanLogs", table =>
+                table.HasCheckConstraint(
+                    "CK_SmartIDScanLogs_ScanStatus",
+                    "\"ScanStatus\" IN ('VALID', 'EXPIRED', 'SUSPENDED', 'LOST', 'INVALID', 'NOT_FOUND', 'UID_ONLY')"));
             entity.HasKey(log => log.Id);
             entity.Property(log => log.Id).ValueGeneratedOnAdd();
             entity.Property(log => log.ScannerUserId).HasMaxLength(450).IsRequired();
@@ -148,9 +162,12 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
 
         builder.Entity<RefreshToken>(entity =>
         {
-            entity.ToTable("RefreshTokens");
-            entity.Property(t => t.Token).HasMaxLength(256).IsRequired();
-            entity.Property(t => t.ReplacedByToken).HasMaxLength(256);
+            entity.ToTable("RefreshTokens", table =>
+                table.HasCheckConstraint(
+                    "CK_RefreshTokens_Expiry",
+                    "\"ExpiresAt\" > \"CreatedAt\""));
+            entity.Property(t => t.Token).HasMaxLength(64).IsRequired();
+            entity.Property(t => t.ReplacedByToken).HasMaxLength(64);
             entity.Property(t => t.CreatedByIp).HasMaxLength(45);
             entity.Property(t => t.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Ignore(t => t.IsActive);
@@ -242,6 +259,29 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
                 .WithMany(section => section.GradeLevelLinks)
                 .HasForeignKey(link => link.SectionId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<TeacherSectionAssignment>(entity =>
+        {
+            entity.ToTable("TeacherSectionAssignments");
+            entity.HasKey(assignment => new
+            {
+                assignment.TeacherId,
+                assignment.GradeLevelId,
+                assignment.SectionId
+            });
+            entity.Property(assignment => assignment.AssignedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.HasIndex(assignment => new { assignment.TeacherId, assignment.SectionId })
+                .HasDatabaseName("IX_TeacherSectionAssignments_Teacher_Section");
+            entity.HasOne(assignment => assignment.Teacher)
+                .WithMany(teacher => teacher.SectionAssignments)
+                .HasForeignKey(assignment => assignment.TeacherId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(assignment => assignment.GradeLevelSection)
+                .WithMany(link => link.TeacherAssignments)
+                .HasForeignKey(assignment => new { assignment.GradeLevelId, assignment.SectionId })
+                .HasPrincipalKey(link => new { link.GradeLevelId, link.SectionId })
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<Subject>(entity =>
@@ -482,7 +522,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
     {
         builder.Entity<AssessmentTypeWeight>(entity =>
         {
-            entity.ToTable("AssessmentTypes");
+            entity.ToTable("AssessmentTypes", table =>
+                table.HasCheckConstraint("CK_AssessmentTypes_WeightPercentage_Range",
+                    "\"WeightPercentage\" >= 0 AND \"WeightPercentage\" <= 100"));
             entity.HasKey(a => a.Name);
             entity.Property(a => a.Name).HasMaxLength(20);
             entity.Property(a => a.DisplayName).HasMaxLength(50).IsRequired();
@@ -491,7 +533,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
 
         builder.Entity<Assessment>(entity =>
         {
-            entity.ToTable("Assessments");
+            entity.ToTable("Assessments", table =>
+                table.HasCheckConstraint("CK_Assessments_MaxScore_Positive", "\"MaxScore\" > 0"));
             entity.Property(a => a.Title).HasMaxLength(200).IsRequired();
             entity.Property(a => a.CustomTypeTitle).HasMaxLength(100);
             entity.Property(a => a.MaxScore).HasPrecision(6, 2);
@@ -523,10 +566,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
 
         builder.Entity<Mark>(entity =>
         {
-            // TR_Marks_Validate is an AFTER trigger. SQL Server cannot use an OUTPUT
-            // clause on a table with triggers, so EF must be told it exists or every
-            // SaveChanges against Marks fails at runtime.
-            entity.ToTable("Marks", t => t.HasTrigger("TR_Marks_Validate"));
+            entity.ToTable("Marks", table =>
+            {
+                table.HasTrigger("TR_Marks_Validate");
+                table.HasCheckConstraint("CK_Marks_Score_NonNegative", "\"Score\" >= 0");
+            });
 
             entity.Property(m => m.Score).HasPrecision(6, 2);
             entity.Property(m => m.Remark).HasMaxLength(300);
