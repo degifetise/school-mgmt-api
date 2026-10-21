@@ -3,8 +3,10 @@ import { AlertCircle, IdCard, Printer, RefreshCw, Search, Trash2, Upload } from 
 import SmartCardView, { SmartCardFace } from '../../components/smart-id/SmartCardView';
 import { API_BASE_URL } from '../../services/api';
 import { smartIdApi } from '../../services/endpoints';
+import { useSchoolInfo } from '../../context/SchoolInfoContext';
 
 export default function SmartIDPrintPage() {
+  const { schoolName: defaultSchoolName } = useSchoolInfo();
   const [lookupText, setLookupText] = useState('');
   const [lookup, setLookup] = useState(null);
   const [searchText, setSearchText] = useState('');
@@ -14,6 +16,13 @@ export default function SmartIDPrintPage() {
   const [previewUserId, setPreviewUserId] = useState('');
   const [fullName, setFullName] = useState('');
   const [status, setStatus] = useState('ACTIVE');
+  const [schoolName, setSchoolName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [guardianPhoneNumber, setGuardianPhoneNumber] = useState('');
+  const [emergencyContactNumber, setEmergencyContactNumber] = useState('');
+  const [bloodGroup, setBloodGroup] = useState('');
+  const [directorFullName, setDirectorFullName] = useState('');
+  const [directorTitle, setDirectorTitle] = useState('');
   const [rotateQrToken, setRotateQrToken] = useState(false);
   const [busy, setBusy] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
@@ -36,8 +45,27 @@ export default function SmartIDPrintPage() {
   useEffect(() => {
     setFullName(preview?.fullName ?? '');
     setStatus(preview?.cardStatus ?? 'ACTIVE');
+    setSchoolName(preview?.schoolName ?? defaultSchoolName);
+    setPhoneNumber(preview?.phoneNumber ?? '');
+    setGuardianPhoneNumber(preview?.guardianPhoneNumber ?? '');
+    setEmergencyContactNumber(preview?.emergencyContact ?? '');
+    setBloodGroup(preview?.bloodGroup ?? '');
+    setDirectorFullName(preview?.directorFullName ?? '');
+    setDirectorTitle(preview?.directorTitle ?? '');
     setRotateQrToken(false);
-  }, [preview?.userId, preview?.fullName, preview?.cardStatus]);
+  }, [
+    preview?.userId,
+    preview?.fullName,
+    preview?.cardStatus,
+    preview?.schoolName,
+    preview?.phoneNumber,
+    preview?.guardianPhoneNumber,
+    preview?.emergencyContact,
+    preview?.bloodGroup,
+    preview?.directorFullName,
+    preview?.directorTitle,
+    defaultSchoolName,
+  ]);
 
   const loadUsers = useCallback(async (search, role) => {
     setListBusy(true);
@@ -108,12 +136,21 @@ export default function SmartIDPrintPage() {
       const updatedCard = await smartIdApi.updateAdminCard(preview.userId, {
         fullName,
         status,
+        schoolName,
+        phoneNumber,
+        guardianPhoneNumber,
+        emergencyContactNumber,
+        bloodGroup,
+        directorFullName,
+        directorTitle,
         rotateQrToken,
       });
+      setUsers((current) => current.map((user) => user.userId === preview.userId
+        ? { ...user, fullName: updatedCard.fullName, card: updatedCard, cardGenerated: true }
+        : user));
       setLookup((current) => current?.userId === preview.userId
         ? { ...current, fullName: updatedCard.fullName, card: updatedCard, cardGenerated: true }
         : current);
-      await loadUsers(searchText, roleFilter);
       setRotateQrToken(false);
     } catch (updateError) {
       setError(updateError.friendlyMessage ?? 'The Smart ID could not be updated.');
@@ -323,10 +360,14 @@ export default function SmartIDPrintPage() {
               <RefreshCw className="size-4" aria-hidden="true" /> Rotate QR secret
             </button>
           </div>
-          <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <label className="text-sm font-medium text-slate-700">
               Cardholder name
               <input className="input mt-1" value={fullName} onChange={(event) => setFullName(event.target.value)} maxLength={150} />
+            </label>
+            <label className="text-sm font-medium text-slate-700">
+              School name / card title
+              <input className="input mt-1" value={schoolName} onChange={(event) => setSchoolName(event.target.value)} maxLength={200} />
             </label>
             <label className="text-sm font-medium text-slate-700">
               Card status
@@ -334,7 +375,33 @@ export default function SmartIDPrintPage() {
                 {['ACTIVE', 'SUSPENDED', 'LOST', 'EXPIRED'].map((value) => <option key={value}>{value}</option>)}
               </select>
             </label>
-            <button type="button" className="btn-primary" disabled={busy} onClick={saveCardChanges}>Save changes</button>
+            <label className="text-sm font-medium text-slate-700">
+              User phone number
+              <input className="input mt-1" type="tel" value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} maxLength={32} />
+            </label>
+            <label className="text-sm font-medium text-slate-700">
+              Guardian phone number
+              <input className="input mt-1" type="tel" value={guardianPhoneNumber} onChange={(event) => setGuardianPhoneNumber(event.target.value)} maxLength={32} />
+            </label>
+            <label className="text-sm font-medium text-slate-700">
+              Emergency contact number
+              <input className="input mt-1" type="tel" value={emergencyContactNumber} onChange={(event) => setEmergencyContactNumber(event.target.value)} maxLength={32} />
+            </label>
+            <label className="text-sm font-medium text-slate-700">
+              Blood group
+              <input className="input mt-1" value={bloodGroup} onChange={(event) => setBloodGroup(event.target.value)} maxLength={10} />
+            </label>
+            <label className="text-sm font-medium text-slate-700">
+              School director / president full name
+              <input className="input mt-1" value={directorFullName} onChange={(event) => setDirectorFullName(event.target.value)} maxLength={150} />
+            </label>
+            <label className="text-sm font-medium text-slate-700">
+              Director / president title
+              <input className="input mt-1" value={directorTitle} onChange={(event) => setDirectorTitle(event.target.value)} maxLength={100} />
+            </label>
+            <div className="flex items-end">
+              <button type="button" className="btn-primary w-full" disabled={busy} onClick={saveCardChanges}>Save changes</button>
+            </div>
           </div>
           {rotateQrToken && <p className="text-xs text-amber-800">Saving rotates the QR signing secret and invalidates existing dynamic QR tokens.</p>}
           <SmartCardView

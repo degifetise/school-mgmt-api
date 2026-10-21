@@ -14,6 +14,12 @@ public class SmartCard
 
     public string Status { get; set; } = "ACTIVE";
 
+    public string? SchoolName { get; set; }
+
+    public string? DirectorFullName { get; set; }
+
+    public string? DirectorTitle { get; set; }
+
     public DateTime IssuedDate { get; set; } = DateTime.UtcNow;
 
     public DateTime ExpirationDate { get; set; }

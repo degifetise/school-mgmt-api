@@ -16,6 +16,12 @@ public class ApplicationUser : IdentityUser
 
     public string? DigitalSignatureUrl { get; set; }
 
+    public string? GuardianPhoneNumber { get; set; }
+
+    public string? EmergencyContactNumber { get; set; }
+
+    public string? BloodGroup { get; set; }
+
     public bool IsActive { get; set; } = true;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

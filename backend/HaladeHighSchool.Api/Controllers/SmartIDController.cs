@@ -663,6 +663,17 @@ public sealed class SmartIDController : PortalControllerBase
             return NotFoundProblem("The cardholder account was not found.");
         }
 
+        if (request.Status is not null
+            && request.Status.Trim().ToUpperInvariant() is not ("ACTIVE" or "SUSPENDED" or "LOST" or "EXPIRED"))
+        {
+            return BadRequestProblem("Invalid card status", "Status must be ACTIVE, SUSPENDED, LOST or EXPIRED.");
+        }
+
+        if (request.SchoolName is not null && string.IsNullOrWhiteSpace(request.SchoolName))
+        {
+            return BadRequestProblem("Invalid school name", "School name cannot be blank.");
+        }
+
         if (request.FullName is not null)
         {
             var fullName = request.FullName.Trim();
@@ -672,6 +683,57 @@ public sealed class SmartIDController : PortalControllerBase
             }
 
             user.FullName = fullName;
+        }
+
+        var student = await _db.Students.FirstOrDefaultAsync(item => item.UserId == userId, cancellationToken);
+        var guardian = await _db.Guardians.FirstOrDefaultAsync(item => item.UserId == userId, cancellationToken);
+        var userChanged = request.FullName is not null;
+
+        if (request.PhoneNumber is not null)
+        {
+            user.PhoneNumber = NullIfBlank(request.PhoneNumber);
+            userChanged = true;
+        }
+
+        if (request.GuardianPhoneNumber is not null)
+        {
+            var guardianPhone = NullIfBlank(request.GuardianPhoneNumber);
+            user.GuardianPhoneNumber = guardianPhone;
+            if (student is not null)
+            {
+                student.GuardianPhone = guardianPhone;
+            }
+            if (guardian is not null)
+            {
+                guardian.PhoneNumber = guardianPhone;
+            }
+            userChanged = true;
+        }
+
+        if (request.EmergencyContactNumber is not null)
+        {
+            var emergencyContact = NullIfBlank(request.EmergencyContactNumber);
+            user.EmergencyContactNumber = emergencyContact;
+            if (student is not null)
+            {
+                student.EmergencyContact = emergencyContact;
+            }
+            userChanged = true;
+        }
+
+        if (request.BloodGroup is not null)
+        {
+            var bloodGroup = NullIfBlank(request.BloodGroup)?.ToUpperInvariant();
+            user.BloodGroup = bloodGroup;
+            if (student is not null)
+            {
+                student.BloodGroup = bloodGroup;
+            }
+            userChanged = true;
+        }
+
+        if (userChanged)
+        {
             var identityResult = await _userManager.UpdateAsync(user);
             if (!identityResult.Succeeded)
             {
@@ -684,12 +746,22 @@ public sealed class SmartIDController : PortalControllerBase
         if (request.Status is not null)
         {
             var status = request.Status.Trim().ToUpperInvariant();
-            if (status is not ("ACTIVE" or "SUSPENDED" or "LOST" or "EXPIRED"))
-            {
-                return BadRequestProblem("Invalid card status", "Status must be ACTIVE, SUSPENDED, LOST or EXPIRED.");
-            }
-
             card.Status = status;
+        }
+
+        if (request.SchoolName is not null)
+        {
+            card.SchoolName = request.SchoolName.Trim();
+        }
+
+        if (request.DirectorFullName is not null)
+        {
+            card.DirectorFullName = NullIfBlank(request.DirectorFullName);
+        }
+
+        if (request.DirectorTitle is not null)
+        {
+            card.DirectorTitle = NullIfBlank(request.DirectorTitle);
         }
 
         if (request.RotateQrToken)
@@ -1143,7 +1215,8 @@ public sealed class SmartIDController : PortalControllerBase
         _db.SmartCards.AsNoTracking()
             .Include(card => card.User)!.ThenInclude(user => user!.Student)!.ThenInclude(student => student!.GradeLevel)
             .Include(card => card.User)!.ThenInclude(user => user!.Student)!.ThenInclude(student => student!.Section)
-            .Include(card => card.User)!.ThenInclude(user => user!.Teacher);
+            .Include(card => card.User)!.ThenInclude(user => user!.Teacher)
+            .Include(card => card.User)!.ThenInclude(user => user!.Guardian);
 
     private static SmartIDCardDetails ToCardDetails(SmartCard card, ApplicationUser user)
     {
@@ -1168,15 +1241,23 @@ public sealed class SmartIDController : PortalControllerBase
             Section = user.Student?.Section?.Name,
             AcademicYear = $"{currentYear}-{currentYear + 1}",
             DateOfBirth = user.Student?.DateOfBirth,
-            EmergencyContact = user.Student?.EmergencyContact ?? user.Student?.GuardianPhone ?? user.PhoneNumber,
-            BloodGroup = user.Student?.BloodGroup,
+            SchoolName = card.SchoolName,
+            PhoneNumber = user.PhoneNumber,
+            GuardianPhoneNumber = user.GuardianPhoneNumber ?? user.Student?.GuardianPhone ?? user.Guardian?.PhoneNumber,
+            EmergencyContact = user.EmergencyContactNumber ?? user.Student?.EmergencyContact,
+            BloodGroup = user.BloodGroup ?? user.Student?.BloodGroup,
             DigitalSignatureUrl = user.DigitalSignatureUrl,
+            DirectorFullName = card.DirectorFullName,
+            DirectorTitle = card.DirectorTitle,
             CardUID = card.CardUID,
             CardStatus = card.Status,
             IssuedDate = card.IssuedDate,
             ExpirationDate = card.ExpirationDate
         };
     }
+
+    private static string? NullIfBlank(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static string ResolveCardStatus(SmartCard card)
     {
