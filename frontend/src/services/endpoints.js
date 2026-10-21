@@ -261,6 +261,13 @@ export const staffApi = {
   create: (payload) => unwrap(api.post('/api/staff/with-photo', toMultipartFormData(payload))),
 };
 
+export const adminUserApi = {
+  list: () => unwrap(api.get('/api/admin/users')),
+  promoteToAdmin: (id) => unwrap(api.post(`/api/admin/users/${encodeURIComponent(id)}/promote`)),
+  setStatus: (id, isActive) =>
+    unwrap(api.patch(`/api/admin/users/${encodeURIComponent(id)}/status`, { isActive })),
+};
+
 export const attendanceApi = {
   list: (params = {}) => unwrap(api.get('/api/attendance', { params })),
   summary: (params = {}) => unwrap(api.get('/api/attendance/summary', { params })),
