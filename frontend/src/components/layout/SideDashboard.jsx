@@ -27,20 +27,45 @@ import { useSchoolInfo } from '../../context/SchoolInfoContext';
 import { notificationApi } from '../../services/endpoints';
 import { API_BASE_URL } from '../../services/api';
 
-const ADMIN_ITEMS = [
-  { to: '/admin/analytics', label: 'Dashboard overview', Icon: LayoutDashboard },
-  { to: '/admin/users', label: 'User management', Icon: Users },
-  { to: '/admin/students', label: 'Student management', Icon: GraduationCap },
-  { to: '/admin/accounts', label: 'Teacher & staff management', Icon: UserRoundCog },
-  { to: '/admin/smart-id/print', label: 'Smart ID management & batch print', Icon: IdCard },
-  { to: '/admin/scanner', label: 'ID scanner', Icon: ScanLine },
-  { to: '/admin/attendance', label: 'Attendance & logs', Icon: ClipboardList },
-  { to: '/admin/parents', label: 'Parents & guardians', Icon: UsersRound },
-  { to: '/admin/subjects', label: 'Subjects', Icon: BookOpen },
-  { to: '/admin/assignments', label: 'Teacher assignments', Icon: Users },
-  { to: '/admin/assessments', label: 'Assessments', Icon: ClipboardCheck },
-  { to: '/admin/feedback', label: 'Student feedback', Icon: MessageSquareText },
-  { to: '/settings', label: 'System settings', Icon: Settings },
+const ADMIN_SECTIONS = [
+  {
+    items: [
+      { to: '/admin/dashboard', label: 'Dashboard overview', Icon: LayoutDashboard },
+      { to: '/admin/events', label: 'Explore Events', Icon: CalendarDays },
+    ],
+  },
+  {
+    label: 'People management',
+    items: [
+      { to: '/admin/users', label: 'User management', Icon: Users },
+      { to: '/admin/students', label: 'Student management', Icon: GraduationCap },
+      { to: '/admin/parents', label: 'Parents & guardians', Icon: UsersRound },
+      { to: '/admin/teachers', label: 'Teacher & staff management', Icon: UserRoundCog },
+    ],
+  },
+  {
+    label: 'Academics & operations',
+    items: [
+      { to: '/admin/subjects', label: 'Subjects', Icon: BookOpen },
+      { to: '/admin/teacher-assignments', label: 'Teacher assignments', Icon: Users },
+      { to: '/admin/assessments', label: 'Assessments', Icon: ClipboardCheck },
+      { to: '/admin/attendance', label: 'Attendance & logs', Icon: ClipboardList },
+      { to: '/admin/feedback', label: 'Student feedback', Icon: MessageSquareText },
+    ],
+  },
+  {
+    label: 'Smart ID system',
+    items: [
+      { to: '/admin/smart-id', label: 'Smart ID management & batch print', Icon: IdCard },
+      { to: '/admin/scanner', label: 'ID scanner', Icon: ScanLine },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
+      { to: '/admin/settings', label: 'System settings', Icon: Settings },
+    ],
+  },
 ];
 
 const ROLE_ITEMS = {
@@ -99,10 +124,9 @@ export default function SideDashboard({
   const width = collapsed ? 'lg:w-20' : 'lg:w-72';
   const primaryRole = [ROLES.admin, ROLES.teacher, ROLES.staff, ROLES.student, ROLES.guardian]
     .find((role) => roles.includes(role));
-  const items = [
-    ...(primaryRole === ROLES.admin ? ADMIN_ITEMS : ROLE_ITEMS[primaryRole] ?? []),
-    { to: '/events', label: 'Explore Events', Icon: CalendarDays },
-  ];
+  const items = primaryRole === ROLES.admin
+    ? ADMIN_SECTIONS
+    : [{ items: [...(ROLE_ITEMS[primaryRole] ?? []), { to: '/events', label: 'Explore Events', Icon: CalendarDays }] }];
   const roleLabel = ROLE_LABELS[primaryRole] ?? 'Portal user';
   const avatarUrl = photoSource(user?.photoUrl ?? user?.profileImageUrl);
   const [notificationOpen, setNotificationOpen] = useState(false);
@@ -254,25 +278,38 @@ export default function SideDashboard({
           </button>
         </div>
 
-        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3" aria-label={`${roleLabel} dashboard`}>
-          {items.map(({ to, label, Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              title={collapsed ? label : undefined}
-              onClick={() => {
-                setNotificationOpen(false);
-                onCloseMobile();
-              }}
-              className={({ isActive }) => `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
-                isActive
-                  ? 'bg-brand-50 text-brand-800 ring-1 ring-inset ring-brand-100'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
-              } ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}
-            >
-              <Icon className="size-5 shrink-0" aria-hidden="true" />
-              <span className={collapsed ? 'lg:sr-only' : ''}>{label}</span>
-            </NavLink>
+        <nav className="min-h-0 flex-1 overflow-y-auto p-3" aria-label={`${roleLabel} dashboard`}>
+          {items.map(({ label: sectionLabel, items: sectionItems }) => (
+            <section key={sectionLabel ?? 'core'} className="mb-3">
+              {sectionLabel && (
+                <h2 className={`mb-1.5 mt-4 px-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 ${
+                  collapsed ? 'lg:sr-only' : ''
+                }`}>
+                  {sectionLabel}
+                </h2>
+              )}
+              <div className="space-y-1">
+                {sectionItems.map(({ to, label, Icon }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    title={collapsed ? label : undefined}
+                    onClick={() => {
+                      setNotificationOpen(false);
+                      onCloseMobile();
+                    }}
+                    className={({ isActive }) => `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-brand-50 text-brand-800 ring-1 ring-inset ring-brand-100'
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
+                    } ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}
+                  >
+                    <Icon className="size-5 shrink-0" aria-hidden="true" />
+                    <span className={collapsed ? 'lg:sr-only' : ''}>{label}</span>
+                  </NavLink>
+                ))}
+              </div>
+            </section>
           ))}
         </nav>
 

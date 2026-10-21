@@ -63,22 +63,27 @@ export default function AppRoutes() {
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={[ROLES.admin]} />}>
+            <Route path="/admin/dashboard" element={<AdminAnalytics />} />
+            <Route path="/admin/events" element={<EventsPage />} />
             <Route path="/admin/smart-id/print" element={<Suspense fallback={<SmartIDPageFallback />}><SmartIDPrintPage /></Suspense>} />
+            <Route path="/admin/smart-id" element={<Suspense fallback={<SmartIDPageFallback />}><SmartIDPrintPage /></Suspense>} />
             <Route path="/admin/scanner" element={<Suspense fallback={<SmartIDPageFallback />}><SmartIDScannerPage /></Suspense>} />
             <Route path="/admin/analytics" element={<AdminAnalytics />} />
             <Route path="/admin/students" element={<AdminStudents />} />
             <Route path="/admin/attendance" element={<AdminAttendance />} />
             <Route path="/admin/assessments" element={<AdminAssessments />} />
             <Route path="/admin/accounts" element={<AdminAccounts />} />
+            <Route path="/admin/teachers" element={<AdminAccounts />} />
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/admin/subjects" element={<SubjectManagementPage />} />
             <Route path="/admin/assignments" element={<TeacherAssignments />} />
+            <Route path="/admin/teacher-assignments" element={<TeacherAssignments />} />
             <Route path="/admin/feedback" element={<AdminFeedback />} />
             <Route path="/admin/guardians" element={<AdminGuardians />} />
             <Route path="/admin/parents" element={<AdminGuardians />} />
             {/* Kept alive so older links and bookmarks still land somewhere useful. */}
             <Route path="/admin" element={<Navigate to="/admin/students" replace />} />
-            <Route path="/admin/settings" element={<Navigate to="/settings" replace />} />
+            <Route path="/admin/settings" element={<SettingsPage />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={[ROLES.teacher, ROLES.staff]} />}>
