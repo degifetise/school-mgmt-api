@@ -16,6 +16,7 @@ import {
   IdCard,
   ScanLine,
   UserCog,
+  Building2,
 } from 'lucide-react';
 import { ROLES } from '../../context/AuthContext';
 
@@ -95,6 +96,13 @@ const NAV_ITEMS = [
     icon: BarChart3,
     description: 'School enrolment and published grade performance',
     roles: [ROLES.admin],
+  },
+  {
+    to: '/superadmin/schools',
+    label: 'Tenant Onboarding',
+    icon: Building2,
+    description: 'Create a school tenant and its primary administrator',
+    roles: [ROLES.superAdmin],
   },
   {
     to: '/admin/students',

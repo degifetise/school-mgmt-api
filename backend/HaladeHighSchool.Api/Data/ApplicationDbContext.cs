@@ -17,6 +17,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
     public DbSet<GradeLevel> GradeLevels => Set<GradeLevel>();
     public DbSet<Section> Sections => Set<Section>();
     public DbSet<GradeLevelSection> GradeLevelSections => Set<GradeLevelSection>();
+    public DbSet<School> Schools => Set<School>();
+    public DbSet<SchoolGradeSection> SchoolGradeSections => Set<SchoolGradeSection>();
     public DbSet<Subject> Subjects => Set<Subject>();
     public DbSet<Student> Students => Set<Student>();
     public DbSet<Teacher> Teachers => Set<Teacher>();
@@ -55,6 +57,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
         builder.HasSequence<long>("SmartCardSerialSequence");
 
         ConfigureIdentity(builder);
+        ConfigureSchoolConfiguration(builder);
         ConfigureAcademicStructure(builder);
         ConfigurePeople(builder);
         ConfigureContent(builder);
@@ -154,6 +157,13 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
     {
         builder.Entity<ApplicationUser>(entity =>
         {
+            entity.Property(user => user.SchoolId)
+                .HasDefaultValue(School.DefaultSchoolId)
+                .IsRequired();
+            entity.HasOne(user => user.School)
+                .WithMany(school => school.Users)
+                .HasForeignKey(user => user.SchoolId)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.Property(u => u.FullName).HasMaxLength(150).IsRequired();
             entity.Property(u => u.ProfileImageUrl).HasMaxLength(500);
             entity.Property(u => u.PhotoUrl).HasMaxLength(500);
@@ -225,6 +235,45 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
                   .WithMany()
                   .HasForeignKey(a => a.RecordedByTeacherId)
                   .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureSchoolConfiguration(ModelBuilder builder)
+    {
+        builder.Entity<School>(entity =>
+        {
+            entity.ToTable("Schools");
+            entity.HasKey(school => school.Id);
+            entity.Property(school => school.Name).HasMaxLength(200).IsRequired();
+            entity.Property(school => school.Code).HasMaxLength(50).IsRequired();
+            entity.Property(school => school.ContactEmail).HasMaxLength(256).IsRequired();
+            entity.Property(school => school.ContactPhone).HasMaxLength(50).IsRequired();
+            entity.Property(school => school.Address).HasMaxLength(500).IsRequired();
+            entity.Property(school => school.SupportedGrades)
+                .HasColumnType("text[]")
+                .IsRequired();
+            entity.Property(school => school.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.HasIndex(school => school.Code).IsUnique().HasDatabaseName("UQ_Schools_Code");
+        });
+
+        builder.Entity<SchoolGradeSection>(entity =>
+        {
+            entity.ToTable("SchoolGradeSections");
+            entity.HasKey(link => new { link.SchoolId, link.GradeLevelId, link.SectionId });
+            entity.HasOne(link => link.School)
+                .WithMany(school => school.GradeSections)
+                .HasForeignKey(link => link.SchoolId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(link => link.GradeLevel)
+                .WithMany()
+                .HasForeignKey(link => link.GradeLevelId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(link => link.Section)
+                .WithMany()
+                .HasForeignKey(link => link.SectionId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(link => new { link.SchoolId, link.GradeLevelId })
+                .HasDatabaseName("IX_SchoolGradeSections_School_Grade");
         });
     }
 

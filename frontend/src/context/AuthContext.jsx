@@ -3,6 +3,7 @@ import { authApi } from '../services/endpoints';
 import { onSessionExpired, tokenStore } from '../services/api';
 
 export const ROLES = {
+  superAdmin: 'SuperAdmin',
   admin: 'Admin',
   teacher: 'Teacher',
   staff: 'Staff',
@@ -177,6 +178,7 @@ export function useAuth() {
 
 /** Where each role lands after signing in: the first job each one has to do. */
 export function homeRouteFor(roles = []) {
+  if (roles.includes(ROLES.superAdmin)) return '/superadmin/schools';
   if (roles.includes(ROLES.admin)) return '/admin/students';
   if (roles.includes(ROLES.teacher)) return '/teacher/students';
   if (roles.includes(ROLES.staff)) return '/staff/scanner';

@@ -15,6 +15,7 @@ const AdminAttendance = lazy(() => import('../pages/admin/AdminAttendance'));
 const AdminAssessments = lazy(() => import('../pages/admin/AdminAssessments'));
 const AdminAccounts = lazy(() => import('../pages/admin/AdminAccounts'));
 const AdminUsers = lazy(() => import('../pages/admin/AdminUsers'));
+const AdminGrades = lazy(() => import('../pages/admin/AdminGrades'));
 const TeacherStudents = lazy(() => import('../pages/teacher/TeacherStudents'));
 const EnterMarks = lazy(() => import('../pages/teacher/EnterMarks'));
 const MyResults = lazy(() => import('../pages/student/MyResults'));
@@ -30,6 +31,7 @@ const ParentDashboard = lazy(() => import('../pages/parent/ParentDashboard'));
 const SmartIDPrintPage = lazy(() => import('../pages/admin/SmartIDPrintPage'));
 const SmartIDScannerPage = lazy(() => import('../pages/SmartIDScannerPage'));
 const MySmartIDPage = lazy(() => import('../pages/MySmartIDPage'));
+const SuperAdminSchools = lazy(() => import('../pages/superadmin/SuperAdminSchools'));
 
 function SmartIDPageFallback() {
   return <p role="status" className="text-sm text-slate-500">Loading Smart ID tools…</p>;
@@ -75,6 +77,7 @@ export default function AppRoutes() {
             <Route path="/admin/accounts" element={<AdminAccounts />} />
             <Route path="/admin/teachers" element={<AdminAccounts />} />
             <Route path="/admin/users" element={<AdminUsers />} />
+            <Route path="/admin/grades" element={<AdminGrades />} />
             <Route path="/admin/subjects" element={<SubjectManagementPage />} />
             <Route path="/admin/assignments" element={<TeacherAssignments />} />
             <Route path="/admin/teacher-assignments" element={<TeacherAssignments />} />
@@ -84,6 +87,10 @@ export default function AppRoutes() {
             {/* Kept alive so older links and bookmarks still land somewhere useful. */}
             <Route path="/admin" element={<Navigate to="/admin/students" replace />} />
             <Route path="/admin/settings" element={<SettingsPage />} />
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={[ROLES.superAdmin]} />}>
+            <Route path="/superadmin/schools" element={<SuperAdminSchools />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={[ROLES.teacher, ROLES.staff]} />}>

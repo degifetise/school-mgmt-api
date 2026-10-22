@@ -47,10 +47,43 @@ public static class SchoolMasterDataSeeder
         ILogger logger,
         CancellationToken cancellationToken = default)
     {
+        await EnsureDefaultSchoolAsync(db, cancellationToken);
         await SeedGradesAsync(db, logger, cancellationToken);
         await SeedSectionsAsync(db, cancellationToken);
         await SeedGradeSectionLinksAsync(db, cancellationToken);
+        await SeedSchoolGradeSectionsAsync(db, cancellationToken);
         await SeedSubjectsAsync(db, cancellationToken);
+    }
+
+    private static async Task EnsureDefaultSchoolAsync(
+        ApplicationDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var existingSchool = await db.Schools
+            .FirstOrDefaultAsync(school => school.Id == School.DefaultSchoolId, cancellationToken);
+        if (existingSchool is not null)
+        {
+            if (string.IsNullOrWhiteSpace(existingSchool.Code))
+            {
+                existingSchool.Code = "DEFAULT";
+                await db.SaveChangesAsync(cancellationToken);
+            }
+
+            return;
+        }
+
+        db.Schools.Add(new School
+        {
+            Id = School.DefaultSchoolId,
+            Name = "School Management System",
+            Code = "DEFAULT",
+            ContactEmail = string.Empty,
+            ContactPhone = string.Empty,
+            Address = string.Empty,
+            SupportedGrades = Grades.Select(grade => grade.Name).ToArray(),
+            CreatedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private static async Task SeedGradesAsync(
@@ -165,6 +198,32 @@ public static class SchoolMasterDataSeeder
             }
         }
 
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task SeedSchoolGradeSectionsAsync(
+        ApplicationDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var schoolId = School.DefaultSchoolId;
+        var existingLinks = (await db.SchoolGradeSections
+                .Where(link => link.SchoolId == schoolId)
+                .Select(link => new { link.GradeLevelId, link.SectionId })
+                .ToListAsync(cancellationToken))
+            .Select(link => (link.GradeLevelId, link.SectionId))
+            .ToHashSet();
+        var gradeSectionLinks = await db.GradeLevelSections
+            .Select(link => new { link.GradeLevelId, link.SectionId })
+            .ToListAsync(cancellationToken);
+
+        db.SchoolGradeSections.AddRange(gradeSectionLinks
+            .Where(link => existingLinks.Add((link.GradeLevelId, link.SectionId)))
+            .Select(link => new SchoolGradeSection
+            {
+                SchoolId = schoolId,
+                GradeLevelId = link.GradeLevelId,
+                SectionId = link.SectionId
+            }));
         await db.SaveChangesAsync(cancellationToken);
     }
 

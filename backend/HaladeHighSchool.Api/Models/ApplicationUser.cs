@@ -8,6 +8,10 @@ namespace HaladeHighSchool.Api.Models;
 /// </summary>
 public class ApplicationUser : IdentityUser
 {
+    public Guid SchoolId { get; set; } = School.DefaultSchoolId;
+
+    public School? School { get; set; }
+
     public string FullName { get; set; } = string.Empty;
 
     public string? ProfileImageUrl { get; set; }

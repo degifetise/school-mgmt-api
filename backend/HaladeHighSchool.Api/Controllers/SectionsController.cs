@@ -29,7 +29,19 @@ public class SectionsController : PortalControllerBase
         [FromQuery] bool includeInactive = false,
         CancellationToken cancellationToken = default)
     {
-        var query = _db.Sections.AsNoTracking();
+        var supportedGrades = await _db.Schools.AsNoTracking()
+            .Where(school => school.Id == CurrentSchoolId)
+            .Select(school => school.SupportedGrades)
+            .FirstOrDefaultAsync(cancellationToken) ?? [];
+        var activeGradeIds = await _db.GradeLevels.AsNoTracking()
+            .Where(grade => supportedGrades.Contains(grade.Name))
+            .Select(grade => grade.Id)
+            .ToListAsync(cancellationToken);
+        var schoolSectionIds = _db.SchoolGradeSections.AsNoTracking()
+            .Where(link => link.SchoolId == CurrentSchoolId && activeGradeIds.Contains(link.GradeLevelId))
+            .Select(link => link.SectionId);
+        var query = _db.Sections.AsNoTracking()
+            .Where(section => schoolSectionIds.Contains(section.Id));
 
         if (gradeLevelId is int selectedGrade)
         {

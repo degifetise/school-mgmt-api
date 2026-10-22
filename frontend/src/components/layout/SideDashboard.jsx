@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   BookOpen,
   Bell,
+  Building2,
   CalendarDays,
   CheckCheck,
   ChevronLeft,
@@ -12,6 +13,7 @@ import {
   GraduationCap,
   IdCard,
   LayoutDashboard,
+  Layers,
   LogOut,
   MessageSquareText,
   ScanLine,
@@ -48,6 +50,7 @@ const ADMIN_SECTIONS = [
     items: [
       { to: '/admin/subjects', label: 'Subjects', Icon: BookOpen },
       { to: '/admin/teacher-assignments', label: 'Teacher assignments', Icon: Users },
+      { to: '/admin/grades', label: 'Manage grades & sections', Icon: Layers },
       { to: '/admin/assessments', label: 'Assessments', Icon: ClipboardCheck },
       { to: '/admin/attendance', label: 'Attendance & logs', Icon: ClipboardList },
       { to: '/admin/feedback', label: 'Student feedback', Icon: MessageSquareText },
@@ -64,6 +67,15 @@ const ADMIN_SECTIONS = [
     label: 'System',
     items: [
       { to: '/admin/settings', label: 'System settings', Icon: Settings },
+    ],
+  },
+];
+
+const SUPERADMIN_SECTIONS = [
+  {
+    label: 'System / Superadmin',
+    items: [
+      { to: '/superadmin/schools', label: 'Tenant Onboarding', Icon: Building2 },
     ],
   },
 ];
@@ -96,6 +108,7 @@ const ROLE_ITEMS = {
 };
 
 const ROLE_LABELS = {
+  [ROLES.superAdmin]: 'Super Administrator',
   [ROLES.admin]: 'Administrator',
   [ROLES.teacher]: 'Teacher',
   [ROLES.staff]: 'Staff',
@@ -122,11 +135,13 @@ export default function SideDashboard({
   const { schoolName } = useSchoolInfo();
   const navigate = useNavigate();
   const width = collapsed ? 'lg:w-20' : 'lg:w-72';
-  const primaryRole = [ROLES.admin, ROLES.teacher, ROLES.staff, ROLES.student, ROLES.guardian]
+  const primaryRole = [ROLES.superAdmin, ROLES.admin, ROLES.teacher, ROLES.staff, ROLES.student, ROLES.guardian]
     .find((role) => roles.includes(role));
-  const items = primaryRole === ROLES.admin
-    ? ADMIN_SECTIONS
-    : [{ items: [...(ROLE_ITEMS[primaryRole] ?? []), { to: '/events', label: 'Explore Events', Icon: CalendarDays }] }];
+  const items = primaryRole === ROLES.superAdmin
+    ? SUPERADMIN_SECTIONS
+    : primaryRole === ROLES.admin
+      ? ADMIN_SECTIONS
+      : [{ items: [...(ROLE_ITEMS[primaryRole] ?? []), { to: '/events', label: 'Explore Events', Icon: CalendarDays }] }];
   const roleLabel = ROLE_LABELS[primaryRole] ?? 'Portal user';
   const avatarUrl = photoSource(user?.photoUrl ?? user?.profileImageUrl);
   const [notificationOpen, setNotificationOpen] = useState(false);
