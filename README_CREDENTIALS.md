@@ -11,14 +11,38 @@ From `backend/HaladeHighSchool.Api`, set local values outside the repository:
 ```powershell
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" "<PostgreSQL connection string>"
 dotnet user-secrets set "Jwt:Key" "<random signing key of at least 32 characters>"
+$env:SuperAdminSettings__Email = "superAdmin01@gmail.com"
+dotnet user-secrets set "SuperAdminSettings:Password" "<unique SuperAdmin password>"
 $env:AdminSettings__Email = "admin@example.edu"
 $env:AdminSettings__Password = "<unique administrator password>"
 ```
+
+The SuperAdmin email defaults to `superAdmin01@gmail.com` and can be overridden with
+`SuperAdminSettings__Email`. Startup creates that account if it does not exist and
+ensures it has the `SuperAdmin` role. Existing account passwords are not reset.
+Production startup fails if `SuperAdminSettings__Password` is missing.
 
 The administrator seeder reads `AdminSettings__Email` and
 `AdminSettings__Password` directly from the process environment. Production startup
 fails if either variable is missing. The administrator's full name is optional and
 can be supplied as `AdminSettings__FullName`.
+
+## Render environment
+
+Configure these variables in the Render service environment; do not commit their
+values:
+
+- `ConnectionStrings__DefaultConnection`: PostgreSQL connection string in Npgsql
+  format (`Host=...;Port=...;Database=...;Username=...;Password=...;SSL Mode=Require`).
+- `Jwt__Key`: strong signing key of at least 32 characters.
+- `SuperAdminSettings__Password`: unique SuperAdmin password.
+- `AdminSettings__Email` and `AdminSettings__Password`: credentials required by the
+  current production Admin seeder.
+
+ASP.NET Core maps double underscores to configuration section separators, so
+`ConnectionStrings__DefaultConnection` is read by
+`GetConnectionString("DefaultConnection")`. The application does not automatically
+convert Render's `DATABASE_URL`; set the named connection-string variable above.
 
 The API uses a 15-minute access token and rotates refresh tokens. The `Jwt` section
 also requires `Issuer`, `Audience`, and `Key`; provide `Jwt__Key` through a secret

@@ -29,6 +29,15 @@ public static class DbSeeder
 
         var accounts = new List<SeededAccount>();
 
+        if (await SeedSuperAdminAsync(
+                userManager,
+                configuration,
+                environment,
+                logger) is { } superAdmin)
+        {
+            accounts.Add(superAdmin);
+        }
+
         if (await SeedAdminAsync(userManager, configuration, environment, logger) is { } admin)
         {
             accounts.Add(admin);
@@ -55,10 +64,121 @@ public static class DbSeeder
         {
             if (!await roleManager.RoleExistsAsync(role))
             {
-                await roleManager.CreateAsync(new IdentityRole(role));
+                var result = await roleManager.CreateAsync(new IdentityRole(role));
+                if (!result.Succeeded)
+                {
+                    var errors = string.Join("; ", result.Errors.Select(error => error.Description));
+                    logger.LogCritical("Could not create the required {Role} role: {Errors}", role, errors);
+                    throw new InvalidOperationException($"Could not create the required {role} role.");
+                }
+
                 logger.LogInformation("Created missing role {Role}", role);
             }
         }
+    }
+
+    private static async Task<SeededAccount?> SeedSuperAdminAsync(
+        UserManager<ApplicationUser> userManager,
+        IConfiguration configuration,
+        IHostEnvironment environment,
+        ILogger logger)
+    {
+        var email = configuration["SuperAdminSettings:Email"] ?? "superAdmin01@gmail.com";
+        var password = configuration["SuperAdminSettings:Password"];
+        var fullName = configuration["SuperAdminSettings:FullName"] ?? "System Super Administrator";
+
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            if (environment.IsProduction())
+            {
+                logger.LogCritical(
+                    "SuperAdmin seeding password is missing in Production; startup cannot continue securely.");
+                throw new InvalidOperationException(
+                    "SuperAdminSettings__Password is required in Production.");
+            }
+
+            logger.LogWarning(
+                "SuperAdminSettings:Password is missing; the SuperAdmin account was not created.");
+            return null;
+        }
+
+        var superAdmin = await userManager.FindByEmailAsync(email);
+        if (superAdmin is null)
+        {
+            superAdmin = new ApplicationUser
+            {
+                SchoolId = School.DefaultSchoolId,
+                UserName = email,
+                Email = email,
+                EmailConfirmed = true,
+                FullName = fullName,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            var createResult = await userManager.CreateAsync(superAdmin, password);
+            if (!createResult.Succeeded)
+            {
+                var errors = string.Join("; ", createResult.Errors.Select(error => error.Description));
+                logger.LogCritical("Could not create the SuperAdmin account: {Errors}", errors);
+                throw new InvalidOperationException("Could not create the configured SuperAdmin account.");
+            }
+
+            logger.LogInformation("Seeded SuperAdmin account {Email}", email);
+        }
+        else
+        {
+            var passwordVerification = userManager.PasswordHasher.VerifyHashedPassword(
+                superAdmin,
+                superAdmin.PasswordHash ?? string.Empty,
+                password);
+            if (passwordVerification != PasswordVerificationResult.Success)
+            {
+                superAdmin.PasswordHash = userManager.PasswordHasher.HashPassword(superAdmin, password);
+                if (passwordVerification == PasswordVerificationResult.Failed)
+                {
+                    superAdmin.SecurityStamp = Guid.NewGuid().ToString("N");
+                }
+
+                var updateResult = await userManager.UpdateAsync(superAdmin);
+                if (!updateResult.Succeeded)
+                {
+                    var errors = string.Join("; ", updateResult.Errors.Select(error => error.Description));
+                    var operation = passwordVerification == PasswordVerificationResult.Failed
+                        ? "update"
+                        : "rehash";
+                    logger.LogCritical("Could not {Operation} the SuperAdmin password for {Email}: {Errors}",
+                        operation,
+                        email,
+                        errors);
+                    throw new InvalidOperationException($"Could not {operation} the configured SuperAdmin password.");
+                }
+
+                logger.LogInformation(
+                    passwordVerification == PasswordVerificationResult.Failed
+                        ? "Updated the configured SuperAdmin password for {Email}"
+                        : "Rehashed the SuperAdmin password for {Email}",
+                    email);
+            }
+        }
+
+        if (!await userManager.IsInRoleAsync(superAdmin, Roles.SuperAdmin))
+        {
+            var roleResult = await userManager.AddToRoleAsync(superAdmin, Roles.SuperAdmin);
+            if (!roleResult.Succeeded)
+            {
+                var errors = string.Join("; ", roleResult.Errors.Select(error => error.Description));
+                logger.LogCritical(
+                    "Could not assign the SuperAdmin role to {Email}: {Errors}",
+                    email,
+                    errors);
+                throw new InvalidOperationException("Could not assign the SuperAdmin role.");
+            }
+
+            logger.LogInformation("Assigned SuperAdmin role to {Email}", email);
+        }
+
+        return new SeededAccount(Roles.SuperAdmin, email, password, WasCreated: false);
     }
 
     private static async Task<SeededAccount?> SeedAdminAsync(
