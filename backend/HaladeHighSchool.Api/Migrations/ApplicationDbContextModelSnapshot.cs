@@ -171,6 +171,11 @@ namespace HaladeHighSchool.Api.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<Guid>("SchoolId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValue(new Guid("11111111-1111-1111-1111-111111111111"));
+
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("text");
 
@@ -192,6 +197,8 @@ namespace HaladeHighSchool.Api.Migrations
                     b.HasIndex("NormalizedUserName")
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex");
+
+                    b.HasIndex("SchoolId");
 
                     b.ToTable("AspNetUsers", (string)null);
                 });
@@ -1051,6 +1058,78 @@ namespace HaladeHighSchool.Api.Migrations
                         });
                 });
 
+            modelBuilder.Entity("HaladeHighSchool.Api.Models.School", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("ContactEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("ContactPhone")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.PrimitiveCollection<string[]>("SupportedGrades")
+                        .IsRequired()
+                        .HasColumnType("text[]");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("UQ_Schools_Code");
+
+                    b.ToTable("Schools", (string)null);
+                });
+
+            modelBuilder.Entity("HaladeHighSchool.Api.Models.SchoolGradeSection", b =>
+                {
+                    b.Property<Guid>("SchoolId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("GradeLevelId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SectionId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("SchoolId", "GradeLevelId", "SectionId");
+
+                    b.HasIndex("GradeLevelId");
+
+                    b.HasIndex("SectionId");
+
+                    b.HasIndex("SchoolId", "GradeLevelId")
+                        .HasDatabaseName("IX_SchoolGradeSections_School_Grade");
+
+                    b.ToTable("SchoolGradeSections", (string)null);
+                });
+
             modelBuilder.Entity("HaladeHighSchool.Api.Models.Section", b =>
                 {
                     b.Property<int>("Id")
@@ -1855,6 +1934,17 @@ namespace HaladeHighSchool.Api.Migrations
                     b.Navigation("Section");
                 });
 
+            modelBuilder.Entity("HaladeHighSchool.Api.Models.ApplicationUser", b =>
+                {
+                    b.HasOne("HaladeHighSchool.Api.Models.School", "School")
+                        .WithMany("Users")
+                        .HasForeignKey("SchoolId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("School");
+                });
+
             modelBuilder.Entity("HaladeHighSchool.Api.Models.Assessment", b =>
                 {
                     b.HasOne("HaladeHighSchool.Api.Models.Section", "Section")
@@ -2126,6 +2216,33 @@ namespace HaladeHighSchool.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("HaladeHighSchool.Api.Models.SchoolGradeSection", b =>
+                {
+                    b.HasOne("HaladeHighSchool.Api.Models.GradeLevel", "GradeLevel")
+                        .WithMany()
+                        .HasForeignKey("GradeLevelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HaladeHighSchool.Api.Models.School", "School")
+                        .WithMany("GradeSections")
+                        .HasForeignKey("SchoolId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HaladeHighSchool.Api.Models.Section", "Section")
+                        .WithMany()
+                        .HasForeignKey("SectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("GradeLevel");
+
+                    b.Navigation("School");
+
+                    b.Navigation("Section");
                 });
 
             modelBuilder.Entity("HaladeHighSchool.Api.Models.SmartCard", b =>
@@ -2404,6 +2521,13 @@ namespace HaladeHighSchool.Api.Migrations
             modelBuilder.Entity("HaladeHighSchool.Api.Models.Guardian", b =>
                 {
                     b.Navigation("StudentGuardians");
+                });
+
+            modelBuilder.Entity("HaladeHighSchool.Api.Models.School", b =>
+                {
+                    b.Navigation("GradeSections");
+
+                    b.Navigation("Users");
                 });
 
             modelBuilder.Entity("HaladeHighSchool.Api.Models.Section", b =>

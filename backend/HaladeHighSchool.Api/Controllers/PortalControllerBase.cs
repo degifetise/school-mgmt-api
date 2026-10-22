@@ -1,4 +1,6 @@
 using HaladeHighSchool.Api.Data;
+using HaladeHighSchool.Api.Configuration;
+using HaladeHighSchool.Api.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,6 +15,11 @@ public sealed record StudentScope(int StudentId, int GradeLevelId, int SectionId
 /// </summary>
 public abstract class PortalControllerBase : ControllerBase
 {
+    protected Guid CurrentSchoolId =>
+        Guid.TryParse(User.FindFirst(PortalClaims.SchoolId)?.Value, out var schoolId)
+            ? schoolId
+            : School.DefaultSchoolId;
+
     /// <summary>
     /// Resolves the caller's class from the database rather than trusting the token, so a
     /// transfer between sections takes effect without waiting for the token to expire.

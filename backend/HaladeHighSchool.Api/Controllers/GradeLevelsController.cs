@@ -31,7 +31,12 @@ public class GradeLevelsController : PortalControllerBase
         [FromQuery] bool includeInactive = false,
         CancellationToken cancellationToken = default)
     {
-        var query = _db.GradeLevels.AsNoTracking();
+        var supportedGrades = await _db.Schools.AsNoTracking()
+            .Where(school => school.Id == CurrentSchoolId)
+            .Select(school => school.SupportedGrades)
+            .FirstOrDefaultAsync(cancellationToken) ?? [];
+        var query = _db.GradeLevels.AsNoTracking()
+            .Where(grade => supportedGrades.Contains(grade.Name));
 
         if (!includeInactive)
         {

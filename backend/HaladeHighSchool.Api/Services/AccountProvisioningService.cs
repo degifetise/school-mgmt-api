@@ -1,5 +1,6 @@
 using System.Data;
 using System.Globalization;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using HaladeHighSchool.Api.Configuration;
 using HaladeHighSchool.Api.Data;
@@ -131,19 +132,22 @@ public class AccountProvisioningService : IAccountProvisioningService
     private readonly ProvisioningSettings _provisioning;
     private readonly ILogger<AccountProvisioningService> _logger;
     private readonly ISystemSettingsService _settings;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
     public AccountProvisioningService(
         ApplicationDbContext db,
         UserManager<ApplicationUser> userManager,
         IOptions<ProvisioningSettings> provisioning,
         ILogger<AccountProvisioningService> logger,
-        ISystemSettingsService settings)
+        ISystemSettingsService settings,
+        IHttpContextAccessor httpContextAccessor)
     {
         _db = db;
         _userManager = userManager;
         _provisioning = provisioning.Value;
         _logger = logger;
         _settings = settings;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public async Task<ProvisionResult<Student>> CreateStudentAsync(
@@ -172,6 +176,19 @@ public class AccountProvisioningService : IAccountProvisioningService
                 cancellationToken))
         {
             return ProvisionResult<Student>.Fail("The selected section is not available for that grade level.");
+        }
+
+        var schoolId = GetCurrentSchoolId();
+        if (!await _db.Schools.AnyAsync(
+                school => school.Id == schoolId && school.SupportedGrades.Contains(gradeLevel.Name),
+                cancellationToken)
+            || !await _db.SchoolGradeSections.AnyAsync(
+                link => link.SchoolId == schoolId
+                    && link.GradeLevelId == request.GradeLevelId
+                    && link.SectionId == request.SectionId,
+                cancellationToken))
+        {
+            return ProvisionResult<Student>.Fail("The selected grade and section are not configured for this school.");
         }
 
         var occupancy = await _db.Students.CountAsync(
@@ -528,6 +545,7 @@ public class AccountProvisioningService : IAccountProvisioningService
     {
         var user = new ApplicationUser
         {
+            SchoolId = GetCurrentSchoolId(),
             UserName = email,
             Email = email,
             EmailConfirmed = true,
@@ -548,6 +566,12 @@ public class AccountProvisioningService : IAccountProvisioningService
         return roleResult.Succeeded
             ? (user, [])
             : (null, roleResult.Errors.Select(e => e.Description).ToArray());
+    }
+
+    private Guid GetCurrentSchoolId()
+    {
+        var claim = _httpContextAccessor.HttpContext?.User.FindFirstValue(PortalClaims.SchoolId);
+        return Guid.TryParse(claim, out var schoolId) ? schoolId : School.DefaultSchoolId;
     }
 
     private async Task LogPhotoPersistenceAsync(

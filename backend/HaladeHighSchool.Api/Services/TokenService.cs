@@ -168,7 +168,8 @@ public class TokenService : ITokenService
             new(ClaimTypes.NameIdentifier, user.Id),
             new(ClaimTypes.Name, user.UserName ?? user.Email ?? user.Id),
             new(ClaimTypes.Email, user.Email ?? string.Empty),
-            new(PortalClaims.FullName, user.FullName)
+            new(PortalClaims.FullName, user.FullName),
+            new(PortalClaims.SchoolId, user.SchoolId.ToString())
         };
 
         claims.AddRange(profile.Roles.Select(role => new Claim(ClaimTypes.Role, role)));

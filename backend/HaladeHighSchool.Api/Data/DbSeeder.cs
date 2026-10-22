@@ -34,6 +34,7 @@ public static class DbSeeder
             accounts.Add(admin);
         }
 
+
         await EnsureAllTeacherRolesAsync(
             services.GetRequiredService<ApplicationDbContext>(),
             userManager,
@@ -91,6 +92,7 @@ public static class DbSeeder
 
         var admin = new ApplicationUser
         {
+            SchoolId = School.DefaultSchoolId,
             UserName = email,
             Email = email,
             EmailConfirmed = true,
@@ -136,7 +138,7 @@ public static class DbSeeder
         }
 
         var teacherEmail = section["Teacher:Email"];
-        // Per-role passwords, falling back to a shared one so either style of config works.
+
         var teacherPassword = section["Teacher:Password"] ?? section["Password"];
         var studentPassword = section["Student:Password"] ?? section["Password"];
 

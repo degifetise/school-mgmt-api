@@ -69,6 +69,10 @@ export const schoolApi = {
   getInfo: () => unwrap(api.get('/api/system-settings/school-info')),
 };
 
+export const superAdminSchoolApi = {
+  create: (payload) => unwrap(api.post('/api/superadmin/schools', payload)),
+};
+
 /** The anonymous surface behind the Home, About and Explore events pages. */
 export const publicApi = {
   overview: () => unwrap(api.get('/api/public/overview')),
@@ -196,6 +200,11 @@ export const gradeLevelApi = {
 
 export const sectionApi = {
   list: (params = {}) => unwrap(api.get('/api/sections', { params })),
+};
+
+export const schoolGradeConfigurationApi = {
+  get: () => unwrap(api.get('/api/admin/grade-configuration')),
+  update: (grades) => unwrap(api.put('/api/admin/grade-configuration', { grades })),
 };
 
 export const subjectApi = {

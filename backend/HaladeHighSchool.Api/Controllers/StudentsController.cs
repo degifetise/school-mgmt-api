@@ -302,6 +302,16 @@ public class StudentsController : PortalControllerBase
             return ValidationProblem(ModelState);
         }
 
+        if (!await _db.SchoolGradeSections.AnyAsync(
+                link => link.SchoolId == CurrentSchoolId
+                    && link.GradeLevelId == request.GradeLevelId
+                    && link.SectionId == request.SectionId,
+                cancellationToken))
+        {
+            ModelState.AddModelError(nameof(request.SectionId), "This grade and section are not configured for your school.");
+            return ValidationProblem(ModelState);
+        }
+
         var isMoving = student.GradeLevelId != request.GradeLevelId || student.SectionId != request.SectionId;
 
         if (isMoving)

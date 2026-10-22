@@ -148,15 +148,19 @@ builder.Services
                 }
 
                 var db = context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
-                var isActive = await db.Users
+                var user = await db.Users
                     .AsNoTracking()
                     .Where(user => user.Id == userId)
-                    .Select(user => (bool?)user.IsActive)
+                    .Select(user => new { user.IsActive, user.SchoolId })
                     .FirstOrDefaultAsync(context.HttpContext.RequestAborted);
 
-                if (isActive != true)
+                var tokenSchoolId = context.Principal?.FindFirstValue(PortalClaims.SchoolId);
+                if (user is null
+                    || !user.IsActive
+                    || !Guid.TryParse(tokenSchoolId, out var schoolId)
+                    || schoolId != user.SchoolId)
                 {
-                    context.Fail("The account is not active.");
+                    context.Fail("The account is not active or its school assignment has changed.");
                 }
             }
         };
@@ -187,6 +191,7 @@ builder.Services.AddCors(options =>
 // Application services
 // ---------------------------------------------------------------------------
 builder.Services.AddMemoryCache();
+builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAccountProvisioningService, AccountProvisioningService>();
