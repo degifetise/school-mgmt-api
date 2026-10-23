@@ -10,7 +10,7 @@ namespace HaladeHighSchool.Api.Controllers;
 [Route("api/admin/teachers/{teacherId:int}/assignments")]
 [Authorize(Roles = Roles.Admin)]
 [Produces("application/json")]
-public sealed class TeacherAssignmentsController(ITeacherAssignmentService assignments) : ControllerBase
+public sealed class TeacherAssignmentsController(ITeacherAssignmentService assignments) : PortalControllerBase
 {
     [HttpGet]
     [ProducesResponseType<IReadOnlyList<TeacherSectionAssignmentResponse>>(StatusCodes.Status200OK)]
@@ -19,7 +19,7 @@ public sealed class TeacherAssignmentsController(ITeacherAssignmentService assig
         int teacherId,
         CancellationToken cancellationToken)
     {
-        var result = await assignments.GetSectionAssignmentsAsync(teacherId, cancellationToken);
+        var result = await assignments.GetSectionAssignmentsAsync(teacherId, CurrentSchoolId, cancellationToken);
         return result is null ? NotFound() : Ok(result);
     }
 
@@ -40,6 +40,7 @@ public sealed class TeacherAssignmentsController(ITeacherAssignmentService assig
         var result = await assignments.AddSectionAssignmentsAsync(
             teacherId,
             request.Assignments,
+            CurrentSchoolId,
             cancellationToken);
         return ToActionResult(result);
     }
@@ -56,6 +57,7 @@ public sealed class TeacherAssignmentsController(ITeacherAssignmentService assig
         var result = await assignments.ReplaceSectionAssignmentsAsync(
             teacherId,
             request.Assignments,
+            CurrentSchoolId,
             cancellationToken);
         return ToActionResult(result);
     }
@@ -68,7 +70,8 @@ public sealed class TeacherAssignmentsController(ITeacherAssignmentService assig
         int sectionId,
         CancellationToken cancellationToken)
     {
-        var removed = await assignments.RemoveSectionAssignmentAsync(teacherId, sectionId, cancellationToken);
+        var removed = await assignments.RemoveSectionAssignmentAsync(
+            teacherId, sectionId, CurrentSchoolId, cancellationToken);
         return removed is null || !removed.Value ? NotFound() : NoContent();
     }
 

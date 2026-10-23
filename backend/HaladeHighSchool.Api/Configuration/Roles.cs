@@ -4,6 +4,7 @@ namespace HaladeHighSchool.Api.Configuration;
 public static class Roles
 {
     public const string Admin = "Admin";
+    public const string SchoolAdmin = "SchoolAdmin";
     public const string SuperAdmin = "SuperAdmin";
     public const string Teacher = "Teacher";
     public const string Staff = "Staff";
@@ -11,10 +12,12 @@ public static class Roles
     public const string Guardian = "Guardian";
 
     public const string AdminOrTeacher = Admin + "," + Teacher;
+    public const string AdminOrSchoolAdmin = Admin + "," + SchoolAdmin;
+    public const string AdminOrSchoolAdminOrTeacher = Admin + "," + SchoolAdmin + "," + Teacher;
     public const string AdminTeacherOrStaff = Admin + "," + Teacher + "," + Staff;
     public const string TeacherOrStaff = Teacher + "," + Staff;
 
-    public static readonly string[] All = [Admin, SuperAdmin, Teacher, Staff, Student, Guardian];
+    public static readonly string[] All = [Admin, SchoolAdmin, SuperAdmin, Teacher, Staff, Student, Guardian];
 }
 
 /// <summary>Custom JWT claim types used by the portal.</summary>

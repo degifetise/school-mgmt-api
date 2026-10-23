@@ -23,6 +23,7 @@ public record AuthResponse
 public record UserProfileResponse
 {
     public string Id { get; init; } = string.Empty;
+    public Guid SchoolId { get; init; }
     public string Email { get; init; } = string.Empty;
     public string FullName { get; init; } = string.Empty;
     public string? ProfileImageUrl { get; init; }

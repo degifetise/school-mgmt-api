@@ -17,20 +17,27 @@ public sealed class AnalyticsService(ApplicationDbContext db) : IAnalyticsServic
         decimal MaxScore);
 
     public async Task<AdminAnalyticsOverviewResponse> GetAdminOverviewAsync(
+        Guid schoolId,
         CancellationToken cancellationToken)
     {
         var totalStudents = await db.Students
             .AsNoTracking()
-            .CountAsync(student => student.IsActive, cancellationToken);
+            .CountAsync(student => student.IsActive
+                && student.User != null
+                && student.User.SchoolId == schoolId, cancellationToken);
         var totalTeachers = await db.Teachers
             .AsNoTracking()
-            .CountAsync(teacher => teacher.IsActive, cancellationToken);
+            .CountAsync(teacher => teacher.IsActive
+                && teacher.User != null
+                && teacher.User.SchoolId == schoolId, cancellationToken);
 
         var gradeCounts = await (
             from student in db.Students.AsNoTracking()
             join grade in db.GradeLevels.AsNoTracking()
                 on student.GradeLevelId equals grade.Id
             where student.IsActive
+                && student.User != null
+                && student.User!.SchoolId == schoolId
             group student by grade.Level into studentsByGrade
             select new { GradeLevel = studentsByGrade.Key, StudentCount = studentsByGrade.Count() })
             .ToDictionaryAsync(row => row.GradeLevel, row => row.StudentCount, cancellationToken);
@@ -41,7 +48,11 @@ public sealed class AnalyticsService(ApplicationDbContext db) : IAnalyticsServic
                 on mark.StudentId equals student.Id
             join assessment in db.Assessments.AsNoTracking()
                 on mark.AssessmentId equals assessment.Id
-            where student.IsActive && mark.IsPublished && assessment.MaxScore > 0
+            where student.IsActive
+                && student.User != null
+                && student.User.SchoolId == schoolId
+                && mark.IsPublished
+                && assessment.MaxScore > 0
             select new PublishedMark(
                 student.Id,
                 mark.SubjectId,
@@ -71,6 +82,7 @@ public sealed class AnalyticsService(ApplicationDbContext db) : IAnalyticsServic
 
     public async Task<TeacherAnalyticsPerformanceResponse> GetTeacherPerformanceAsync(
         int? requestedTeacherId,
+        Guid schoolId,
         CancellationToken cancellationToken)
     {
         if (requestedTeacherId is not int teacherId)
@@ -80,7 +92,11 @@ public sealed class AnalyticsService(ApplicationDbContext db) : IAnalyticsServic
 
         var teacherExists = await db.Teachers
             .AsNoTracking()
-            .AnyAsync(teacher => teacher.Id == teacherId && teacher.IsActive, cancellationToken);
+            .AnyAsync(teacher => teacher.Id == teacherId
+                && teacher.IsActive
+                && teacher.User != null
+                && teacher.User.SchoolId == schoolId,
+                cancellationToken);
 
         if (!teacherExists)
         {
@@ -105,6 +121,8 @@ public sealed class AnalyticsService(ApplicationDbContext db) : IAnalyticsServic
             where assignment.TeacherId == teacherId
                 && assignment.IsActive
                 && student.IsActive
+                && student.User != null
+                && student.User!.SchoolId == schoolId
                 && subject.GradeLevelId == student.GradeLevelId
                 && mark.IsPublished
                 && assessment.MaxScore > 0

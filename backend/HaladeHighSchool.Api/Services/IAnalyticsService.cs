@@ -4,9 +4,12 @@ namespace HaladeHighSchool.Api.Services;
 
 public interface IAnalyticsService
 {
-    Task<AdminAnalyticsOverviewResponse> GetAdminOverviewAsync(CancellationToken cancellationToken);
+    Task<AdminAnalyticsOverviewResponse> GetAdminOverviewAsync(
+        Guid schoolId,
+        CancellationToken cancellationToken);
 
     Task<TeacherAnalyticsPerformanceResponse> GetTeacherPerformanceAsync(
         int? teacherId,
+        Guid schoolId,
         CancellationToken cancellationToken);
 }

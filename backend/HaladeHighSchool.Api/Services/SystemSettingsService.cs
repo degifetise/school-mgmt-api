@@ -52,7 +52,9 @@ public class SystemSettingsService : ISystemSettingsService
             SchoolName = snapshot.Value(SchoolNameKey) is { Length: > 0 } name ? name : DefaultSchoolName,
             ContactEmail = snapshot.Value(ContactEmailKey),
             AcademicYear = NormalizeAcademicYear(snapshot.Value(AcademicYearKey)),
-            AllowSelfRegistration = ParseSelfRegistration(snapshot.Value(SelfRegistrationKey))
+            AllowSelfRegistration = ParseSelfRegistration(snapshot.Value(SelfRegistrationKey)),
+            HeroSubtitle = "Nursery through Grade 12, one portal.",
+            HeroDescription = "Lessons, weighted assessments and report cards in one place."
         };
     }
 
@@ -68,9 +70,6 @@ public class SystemSettingsService : ISystemSettingsService
 
         (string Key, string? Value, string Description)[] incoming =
         [
-            (SchoolNameKey,
-                request.SchoolName.Trim(),
-                "Displayed in the portal header and reports"),
             (ContactEmailKey,
                 contactEmail,
                 "Public contact address"),
@@ -145,7 +144,7 @@ public class SystemSettingsService : ISystemSettingsService
         ParseSelfRegistration(await GetAsync(SelfRegistrationKey, cancellationToken));
 
     /// <summary>
-    /// All six rows, read once and then served from memory. Every accessor on this service goes
+    /// All five editable rows, read once and then served from memory. Every accessor on this service goes
     /// through here, so a request that needs the pass mark and the academic year costs one query
     /// on a cold cache and none on a warm one.
     /// </summary>

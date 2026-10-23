@@ -119,7 +119,10 @@ public class GuardiansController : PortalControllerBase
     {
         var student = await _db.Students
             .AsNoTracking()
-            .Where(s => s.Id == request.StudentId && s.IsActive)
+            .Where(s => s.Id == request.StudentId
+                && s.IsActive
+                && s.User != null
+                && s.User.SchoolId == CurrentSchoolId)
             .Select(s => new { s.Id, s.UserId, s.StudentIdNumber, UserFullName = s.User != null ? s.User.FullName : string.Empty })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -132,8 +135,12 @@ public class GuardiansController : PortalControllerBase
             .AsNoTracking()
             .AnyAsync(
                 sg => sg.StudentId == request.StudentId
+                    && sg.Student != null
+                    && sg.Student.User != null
+                    && sg.Student.User.SchoolId == CurrentSchoolId
                     && sg.Guardian != null
                     && sg.Guardian.User != null
+                    && sg.Guardian.User.SchoolId == CurrentSchoolId
                     && sg.Guardian.User.Email != null
                     && sg.Guardian.User.Email == request.Email,
                 cancellationToken);
@@ -196,7 +203,10 @@ public class GuardiansController : PortalControllerBase
     {
         var student = await _db.Students
             .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Id == studentId && s.IsActive, cancellationToken);
+            .FirstOrDefaultAsync(s => s.Id == studentId
+                && s.IsActive
+                && s.User != null
+                && s.User.SchoolId == CurrentSchoolId, cancellationToken);
 
         if (student is null)
         {
@@ -205,7 +215,9 @@ public class GuardiansController : PortalControllerBase
 
         var guardian = await _db.Guardians
             .Include(g => g.User)
-            .FirstOrDefaultAsync(g => g.Id == request.GuardianId, cancellationToken);
+            .FirstOrDefaultAsync(g => g.Id == request.GuardianId
+                && g.User != null
+                && g.User.SchoolId == CurrentSchoolId, cancellationToken);
 
         if (guardian is null)
         {

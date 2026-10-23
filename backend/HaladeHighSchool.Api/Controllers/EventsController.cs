@@ -44,7 +44,7 @@ public class EventsController : PortalControllerBase
         [FromQuery] string? status = null,
         CancellationToken cancellationToken = default)
     {
-        var isAdmin = User.IsInRole(Roles.Admin);
+        var isAdmin = User.IsSchoolAdministrator();
         var targetStakeholders = User.IsInRole(Roles.Student)
             ? "Students"
             : User.IsInRole(Roles.Teacher) ? "Teachers" : null;
@@ -54,10 +54,13 @@ public class EventsController : PortalControllerBase
         var sectionId = int.TryParse(User.FindFirstValue(PortalClaims.SectionId), out var section)
             ? section
             : (int?)null;
+        var schoolId = User.Identity?.IsAuthenticated == true
+            ? User.GetSchoolId() ?? Guid.Empty
+            : (Guid?)null;
 
         return Ok(await ExecuteAsync(() => _events.GetEventsAsync(
             page, pageSize, search, category, status, cancellationToken,
-            targetStakeholders, gradeLevelId, sectionId, isAdmin)));
+            targetStakeholders, gradeLevelId, sectionId, isAdmin, schoolId)));
     }
 
     [HttpGet("{id:int}")]
@@ -67,37 +70,52 @@ public class EventsController : PortalControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<EventDto>> GetEvent(int id, CancellationToken cancellationToken)
     {
-        var result = await _events.GetEventAsync(id, cancellationToken);
+        var schoolId = User.Identity?.IsAuthenticated == true
+            ? User.GetSchoolId() ?? Guid.Empty
+            : (Guid?)null;
+        var result = await _events.GetEventAsync(id, schoolId, cancellationToken);
         return result is null ? NotFoundProblem($"Event {id} was not found.") : Ok(result);
     }
 
     [HttpPost]
-    [Authorize(Roles = Roles.Admin)]
+    [Authorize(Roles = Roles.AdminOrSchoolAdmin)]
     [EndpointSummary("Create an event")]
     [ProducesResponseType<EventDto>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<EventDto>> CreateEvent(CreateEventDto request, CancellationToken cancellationToken)
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult<EventDto>> CreateEvent(
+        [FromForm] CreateEventDto request,
+        CancellationToken cancellationToken)
     {
         var organizerUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var schoolId = User.GetSchoolId();
         if (string.IsNullOrWhiteSpace(organizerUserId))
         {
             return Unauthorized(new { message = "The authenticated organizer identity is missing." });
+        }
+        if (schoolId is null)
+        {
+            return Unauthorized(new { message = "The authenticated school identity is missing." });
         }
 
         try
         {
             var organizerExists = await _db.Users
                 .AsNoTracking()
-                .AnyAsync(user => user.Id == organizerUserId, cancellationToken);
+                .AnyAsync(user => user.Id == organizerUserId && user.SchoolId == schoolId, cancellationToken);
             if (!organizerExists)
             {
                 return Unauthorized(new { message = "The authenticated organizer account no longer exists." });
             }
 
-            var result = await _events.CreateEventAsync(request, organizerUserId, cancellationToken);
+            var result = await _events.CreateEventAsync(request, organizerUserId, schoolId.Value, cancellationToken);
             return CreatedAtAction(nameof(GetEvent), new { id = result.Id }, result);
+        }
+        catch (EventImageStorageException exception)
+        {
+            return BadRequestProblem("Invalid event image", exception.Message);
         }
         catch (Exception ex)
         {
@@ -111,18 +129,32 @@ public class EventsController : PortalControllerBase
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = Roles.Admin)]
+    [Authorize(Roles = Roles.AdminOrSchoolAdmin)]
     [EndpointSummary("Update an event")]
     [ProducesResponseType<EventDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<EventDto>> UpdateEvent(int id, UpdateEventDto request, CancellationToken cancellationToken)
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult<EventDto>> UpdateEvent(
+        int id,
+        [FromForm] UpdateEventDto request,
+        CancellationToken cancellationToken)
     {
-        var result = await _events.UpdateEventAsync(id, request, cancellationToken);
+        var schoolId = User.GetSchoolId();
+        if (schoolId is null) return Unauthorized();
+        EventDto? result;
+        try
+        {
+            result = await _events.UpdateEventAsync(id, request, schoolId.Value, cancellationToken);
+        }
+        catch (EventImageStorageException exception)
+        {
+            return BadRequestProblem("Invalid event image", exception.Message);
+        }
         return result is null ? NotFoundProblem($"Event {id} was not found.") : Ok(result);
     }
 
     [HttpPatch("{id:int}/status")]
-    [Authorize(Roles = Roles.Admin)]
+    [Authorize(Roles = Roles.AdminOrSchoolAdmin)]
     [EndpointSummary("Manually update an event status")]
     [ProducesResponseType<EventDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -134,7 +166,9 @@ public class EventsController : PortalControllerBase
 
         try
         {
-            var result = await _events.UpdateStatusAsync(id, request.Status, cancellationToken);
+            var schoolId = User.GetSchoolId();
+            if (schoolId is null) return Unauthorized();
+            var result = await _events.UpdateStatusAsync(id, request.Status, schoolId.Value, cancellationToken);
             return result is null ? NotFoundProblem($"Event {id} was not found.") : Ok(result);
         }
         catch (EventServiceException exception) when (exception.StatusCode == StatusCodes.Status400BadRequest)
@@ -144,12 +178,18 @@ public class EventsController : PortalControllerBase
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = Roles.Admin)]
+    [Authorize(Roles = Roles.AdminOrSchoolAdmin)]
     [EndpointSummary("Cancel an event")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> DeleteEvent(int id, CancellationToken cancellationToken) =>
-        await _events.DeleteEventAsync(id, cancellationToken) ? NoContent() : NotFoundProblem($"Event {id} was not found.");
+    public async Task<IActionResult> DeleteEvent(int id, CancellationToken cancellationToken)
+    {
+        var schoolId = User.GetSchoolId();
+        if (schoolId is null) return Unauthorized();
+        return await _events.DeleteEventAsync(id, schoolId.Value, cancellationToken)
+            ? NoContent()
+            : NotFoundProblem($"Event {id} was not found.");
+    }
 
     [HttpPost("{id:int}/register")]
     [Authorize]
@@ -179,7 +219,9 @@ public class EventsController : PortalControllerBase
             });
         }
 
-        var isAdmin = User.IsAdmin();
+        var isAdmin = User.IsSchoolAdministrator();
+        var schoolId = User.GetSchoolId();
+        if (schoolId is null) return Unauthorized();
         var studentId = isAdmin ? request.StudentId : User.GetStudentId();
         if (studentId is null)
             return ForbiddenProblem("The signed-in account is not linked to an active student.");
@@ -189,7 +231,7 @@ public class EventsController : PortalControllerBase
 
         try
         {
-            var result = await _events.RegisterAsync(id, studentId.Value, cancellationToken);
+            var result = await _events.RegisterAsync(id, studentId.Value, schoolId.Value, cancellationToken);
             return StatusCode(StatusCodes.Status201Created, result);
         }
         catch (EventServiceException exception) when (exception.StatusCode is
@@ -239,23 +281,30 @@ public class EventsController : PortalControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> CancelRegistration(int id, RegisterEventDto request, CancellationToken cancellationToken)
     {
-        var studentId = User.IsAdmin() ? request.StudentId : User.GetStudentId();
-        if (studentId is null || (!User.IsAdmin() && studentId.Value != request.StudentId))
+        var schoolId = User.GetSchoolId();
+        if (schoolId is null) return Unauthorized();
+        var isAdmin = User.IsSchoolAdministrator();
+        var studentId = isAdmin ? request.StudentId : User.GetStudentId();
+        if (studentId is null || (!isAdmin && studentId.Value != request.StudentId))
             return ForbiddenProblem("You may only cancel your own student registration.");
-        return await _events.CancelRegistrationAsync(id, studentId.Value, cancellationToken)
+        return await _events.CancelRegistrationAsync(id, studentId.Value, schoolId.Value, cancellationToken)
             ? NoContent()
             : NotFoundProblem("Active event registration was not found.");
     }
 
     [HttpGet("{id:int}/registrations")]
-    [Authorize(Roles = Roles.Admin)]
+    [Authorize(Roles = Roles.AdminOrSchoolAdmin)]
     [EndpointSummary("List registrations for an event")]
     [ProducesResponseType<IReadOnlyList<EventRegistrationDto>>(StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyList<EventRegistrationDto>>> GetRegistrations(int id, CancellationToken cancellationToken) =>
-        Ok(await _events.GetRegistrationsAsync(id, cancellationToken));
+    public async Task<ActionResult<IReadOnlyList<EventRegistrationDto>>> GetRegistrations(int id, CancellationToken cancellationToken)
+    {
+        var schoolId = User.GetSchoolId();
+        if (schoolId is null) return Unauthorized();
+        return Ok(await _events.GetRegistrationsAsync(id, schoolId.Value, cancellationToken));
+    }
 
     [HttpGet("{id:int}/comments")]
-    [Authorize(Roles = Roles.Admin + "," + Roles.Teacher + "," + Roles.Student)]
+    [Authorize(Roles = Roles.AdminOrSchoolAdmin + "," + Roles.Teacher + "," + Roles.Student)]
     [EndpointSummary("List comments and replies for an event visible to the caller")]
     [ProducesResponseType<IReadOnlyList<EventCommentResponse>>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -283,7 +332,7 @@ public class EventsController : PortalControllerBase
     }
 
     [HttpPost("{id:int}/comments")]
-    [Authorize(Roles = Roles.Admin + "," + Roles.Teacher + "," + Roles.Student)]
+    [Authorize(Roles = Roles.AdminOrSchoolAdmin + "," + Roles.Teacher + "," + Roles.Student)]
     [EndpointSummary("Post a comment on an event visible to the caller")]
     [ProducesResponseType<EventCommentResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -295,7 +344,7 @@ public class EventsController : PortalControllerBase
         await CreateEventCommentAsync(id, request, isAdminReply: false, cancellationToken);
 
     [HttpPost("{id:int}/comments/reply")]
-    [Authorize(Roles = Roles.Admin)]
+    [Authorize(Roles = Roles.AdminOrSchoolAdmin)]
     [EndpointSummary("Reply as an administrator to a top-level event comment")]
     [ProducesResponseType<EventCommentResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -318,7 +367,7 @@ public class EventsController : PortalControllerBase
         if (isAdminReply && request.ParentCommentId is null)
             return BadRequestProblem("Invalid reply", "A parent comment is required for an administrator reply.");
 
-        if (!User.IsInRole(Roles.Admin) && request.ParentCommentId is not null)
+        if (!User.IsSchoolAdministrator() && request.ParentCommentId is not null)
             return ForbiddenProblem("Only administrators can reply directly to an event comment.");
 
         var context = await GetCommentContextAsync(eventId, cancellationToken);
@@ -366,11 +415,14 @@ public class EventsController : PortalControllerBase
     [ProducesResponseType<EventDashboardStatsDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<EventDashboardStatsDto>> GetDashboardStats([FromQuery] int count = 5, CancellationToken cancellationToken = default)
     {
-        var upcoming = await _events.GetUpcomingEventsAsync(count, cancellationToken);
-        var popular = await _events.GetPopularEventsAsync(count, cancellationToken);
+        var schoolId = User.Identity?.IsAuthenticated == true
+            ? User.GetSchoolId() ?? Guid.Empty
+            : (Guid?)null;
+        var upcoming = await _events.GetUpcomingEventsAsync(count, schoolId, cancellationToken);
+        var popular = await _events.GetPopularEventsAsync(count, schoolId, cancellationToken);
         return Ok(new EventDashboardStatsDto
         {
-            TotalRegistrations = await _events.GetTotalRegistrationsCountAsync(cancellationToken),
+            TotalRegistrations = await _events.GetTotalRegistrationsCountAsync(schoolId, cancellationToken),
             UpcomingEvents = upcoming,
             PopularEvents = popular
         });
@@ -388,7 +440,7 @@ public class EventsController : PortalControllerBase
             .FirstOrDefaultAsync(account => account.Id == userId && account.IsActive, cancellationToken);
         if (user is null) return null;
 
-        var role = User.IsInRole(Roles.Admin)
+        var role = User.IsSchoolAdministrator()
             ? Roles.Admin
             : User.IsInRole(Roles.Teacher)
                 ? Roles.Teacher
@@ -397,7 +449,9 @@ public class EventsController : PortalControllerBase
 
         var calendarEvent = await _db.Events
             .AsNoTracking()
-            .FirstOrDefaultAsync(item => item.Id == eventId && !item.IsDeleted, cancellationToken);
+            .FirstOrDefaultAsync(item => item.Id == eventId
+                && item.SchoolId == user.SchoolId
+                && !item.IsDeleted, cancellationToken);
         if (calendarEvent is null) return null;
 
         int? studentId = null;
@@ -411,7 +465,10 @@ public class EventsController : PortalControllerBase
             {
                 var student = await _db.Students
                     .AsNoTracking()
-                    .FirstOrDefaultAsync(item => item.UserId == userId && item.IsActive, cancellationToken);
+                    .FirstOrDefaultAsync(item => item.UserId == userId
+                        && item.IsActive
+                        && item.User != null
+                        && item.User.SchoolId == user.SchoolId, cancellationToken);
                 if (student is null || User.GetStudentId() is int claimStudentId && claimStudentId != student.Id)
                     return null;
                 if (!CanStudentViewEvent(calendarEvent, student)) return null;
@@ -421,7 +478,10 @@ public class EventsController : PortalControllerBase
             {
                 var teacher = await _db.Teachers
                     .AsNoTracking()
-                    .FirstOrDefaultAsync(item => item.UserId == userId && item.IsActive, cancellationToken);
+                    .FirstOrDefaultAsync(item => item.UserId == userId
+                        && item.IsActive
+                        && item.User != null
+                        && item.User.SchoolId == user.SchoolId, cancellationToken);
                 if (teacher is null) return null;
                 if (!await CanTeacherViewEventAsync(calendarEvent, teacher.Id, cancellationToken))
                     return null;

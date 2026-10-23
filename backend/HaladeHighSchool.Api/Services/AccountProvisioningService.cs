@@ -13,6 +13,8 @@ namespace HaladeHighSchool.Api.Services;
 
 public record ProvisionStudentRequest
 {
+    public Guid? SchoolId { get; init; }
+
     /// <summary>Leave blank to generate a compliant temporary password.</summary>
     public string? Password { get; init; }
     public string? Email { get; init; }
@@ -29,6 +31,8 @@ public record ProvisionStudentRequest
 
 public record ProvisionTeacherRequest
 {
+    public Guid? SchoolId { get; init; }
+
     public string Email { get; init; } = string.Empty;
     public string? Password { get; init; }
     public string FullName { get; init; } = string.Empty;
@@ -178,7 +182,7 @@ public class AccountProvisioningService : IAccountProvisioningService
             return ProvisionResult<Student>.Fail("The selected section is not available for that grade level.");
         }
 
-        var schoolId = GetCurrentSchoolId();
+        var schoolId = request.SchoolId ?? GetCurrentSchoolId();
         if (!await _db.Schools.AnyAsync(
                 school => school.Id == schoolId && school.SupportedGrades.Contains(gradeLevel.Name),
                 cancellationToken)
@@ -194,6 +198,8 @@ public class AccountProvisioningService : IAccountProvisioningService
         var occupancy = await _db.Students.CountAsync(
             s => s.GradeLevelId == request.GradeLevelId
               && s.SectionId == request.SectionId
+              && s.User != null
+              && s.User.SchoolId == schoolId
               && s.IsActive,
             cancellationToken);
 
@@ -225,7 +231,8 @@ public class AccountProvisioningService : IAccountProvisioningService
                 request.FullName,
                 generatedPassword ?? request.Password!,
                 Roles.Student,
-                request.PhotoUrl);
+                request.PhotoUrl,
+                schoolId);
 
             if (userResult.User is null)
             {
@@ -292,7 +299,8 @@ public class AccountProvisioningService : IAccountProvisioningService
                 request.FullName,
                 generatedPassword ?? request.Password!,
                 Roles.Teacher,
-                request.PhotoUrl);
+                request.PhotoUrl,
+                request.SchoolId);
 
             if (userResult.User is null)
             {
@@ -374,8 +382,12 @@ public class AccountProvisioningService : IAccountProvisioningService
             return ProvisionResult<StudentGuardian>.Fail($"The email '{request.Email}' is already registered.");
         }
 
+        var schoolId = GetCurrentSchoolId();
         var student = await _db.Students
-            .FirstOrDefaultAsync(s => s.Id == request.StudentId && s.IsActive, cancellationToken);
+            .FirstOrDefaultAsync(s => s.Id == request.StudentId
+                && s.IsActive
+                && s.User != null
+                && s.User.SchoolId == schoolId, cancellationToken);
 
         if (student is null)
         {
@@ -392,11 +404,16 @@ public class AccountProvisioningService : IAccountProvisioningService
                 request.Email,
                 request.FullName,
                 generatedPassword ?? request.Password!,
-                Roles.Guardian);
+                Roles.Guardian,
+                schoolId: schoolId);
 
             if (userResult.User is null)
             {
                 return ProvisionResult<StudentGuardian>.Fail(userResult.Errors);
+            }
+            if (userResult.User.SchoolId != schoolId)
+            {
+                return ProvisionResult<StudentGuardian>.Fail("The guardian account does not belong to the selected school.");
             }
 
             var guardian = new Guardian
@@ -541,11 +558,12 @@ public class AccountProvisioningService : IAccountProvisioningService
         string fullName,
         string password,
         string role,
-        string? photoUrl = null)
+        string? photoUrl = null,
+        Guid? schoolId = null)
     {
         var user = new ApplicationUser
         {
-            SchoolId = GetCurrentSchoolId(),
+            SchoolId = schoolId ?? GetCurrentSchoolId(),
             UserName = email,
             Email = email,
             EmailConfirmed = true,

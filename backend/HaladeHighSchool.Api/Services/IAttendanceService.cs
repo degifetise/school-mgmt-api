@@ -24,12 +24,14 @@ public interface IAttendanceService
         MarkAttendanceRequest request,
         int? teacherId,
         bool isAdmin,
+        Guid schoolId,
         CancellationToken cancellationToken = default);
 
     Task<AttendanceOperationResult> BulkMarkAsync(
         BulkMarkAttendanceRequest request,
         int? teacherId,
         bool isAdmin,
+        Guid schoolId,
         CancellationToken cancellationToken = default);
 }
 

@@ -17,11 +17,15 @@ public class Event
 {
     public int Id { get; set; }
 
+    public Guid SchoolId { get; set; }
+
     public string Title { get; set; } = string.Empty;
 
     public string? Description { get; set; }
 
     public string? BannerImageUrl { get; set; }
+
+    public string[] ImageUrls { get; set; } = [];
 
     [NotMapped]
     public string? BannerUrl { get => BannerImageUrl; set => BannerImageUrl = value; }
@@ -99,6 +103,8 @@ public class Event
     public Section? Section { get; set; }
 
     public ApplicationUser? OrganizedByUser { get; set; }
+
+    public School? School { get; set; }
 
     public ICollection<EventRegistration> Registrations { get; set; } = new List<EventRegistration>();
     public ICollection<EventComment> Comments { get; set; } = new List<EventComment>();

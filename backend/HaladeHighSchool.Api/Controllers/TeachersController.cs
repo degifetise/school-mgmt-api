@@ -66,7 +66,7 @@ public class TeachersController : PortalControllerBase
             return ForbiddenProblem("Your account is not linked to a teacher profile.");
         }
 
-        var teacher = await ProjectDetail(_db.Teachers.AsNoTracking().Where(t => t.Id == teacherId))
+        var teacher = await ProjectDetail(SchoolTeachers(_db.Teachers.AsNoTracking()).Where(t => t.Id == teacherId))
             .FirstOrDefaultAsync(cancellationToken);
 
         return teacher is null ? NotFoundProblem("Teacher profile not found.") : Ok(teacher);
@@ -89,9 +89,10 @@ public class TeachersController : PortalControllerBase
                 return NotFound(new { message = "Teacher profile is not linked to this user account." });
             }
 
-            var teacher = await _db.Teachers
+            var teacher = await SchoolTeachers(_db.Teachers)
                 .AsNoTracking()
-                .Where(t => t.UserId == userId && t.IsActive)
+                .Where(t => t.UserId == userId && t.IsActive
+                    && t.User != null && t.User.SchoolId == CurrentSchoolId)
                 .Select(t => new { t.Id })
                 .FirstOrDefaultAsync(cancellationToken);
 
@@ -151,9 +152,10 @@ public class TeachersController : PortalControllerBase
                 return NotFound(new { message = "Teacher profile not found" });
             }
 
-            var teacher = await _db.Teachers
+            var teacher = await SchoolTeachers(_db.Teachers)
                 .AsNoTracking()
-                .Where(t => t.UserId == userId && t.IsActive)
+                .Where(t => t.UserId == userId && t.IsActive
+                    && t.User != null && t.User.SchoolId == CurrentSchoolId)
                 .Select(t => new { t.Id })
                 .FirstOrDefaultAsync(cancellationToken);
 
@@ -189,7 +191,9 @@ public class TeachersController : PortalControllerBase
             var students = await _db.Students
                 .AsNoTracking()
                 .Where(s => s.SectionId == assignment.SectionId
-                         && s.GradeLevelId == assignment.GradeLevelId)
+                         && s.GradeLevelId == assignment.GradeLevelId
+                         && s.User != null
+                         && s.User.SchoolId == CurrentSchoolId)
                 .OrderBy(s => s.StudentIdNumber)
                 .Select(s => new
                 {
@@ -327,7 +331,7 @@ public class TeachersController : PortalControllerBase
         page = Math.Max(page, 1);
         pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
 
-        var query = _db.Teachers.AsNoTracking();
+        var query = SchoolTeachers(_db.Teachers.AsNoTracking());
 
         if (!includeInactive)
         {
@@ -379,7 +383,7 @@ public class TeachersController : PortalControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<TeacherDetailResponse>> GetTeacher(int id, CancellationToken cancellationToken)
     {
-        var teacher = await ProjectDetail(_db.Teachers.AsNoTracking().Where(t => t.Id == id))
+        var teacher = await ProjectDetail(SchoolTeachers(_db.Teachers.AsNoTracking()).Where(t => t.Id == id))
             .FirstOrDefaultAsync(cancellationToken);
 
         return teacher is null ? NotFoundProblem($"Teacher {id} was not found.") : Ok(teacher);
@@ -465,7 +469,7 @@ public class TeachersController : PortalControllerBase
             });
         }
 
-        var detail = await ProjectDetail(_db.Teachers.AsNoTracking().Where(t => t.Id == result.Entity.Id))
+        var detail = await ProjectDetail(SchoolTeachers(_db.Teachers.AsNoTracking()).Where(t => t.Id == result.Entity.Id))
             .FirstAsync(cancellationToken);
 
         _logger.LogInformation("Admin {Admin} hired teacher {EmployeeId}", User.GetUserId(), detail.EmployeeId);
@@ -486,7 +490,7 @@ public class TeachersController : PortalControllerBase
         UpdateTeacherRequest request,
         CancellationToken cancellationToken)
     {
-        var teacher = await _db.Teachers
+        var teacher = await SchoolTeachers(_db.Teachers)
             .Include(t => t.User)
             .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
 
@@ -509,7 +513,7 @@ public class TeachersController : PortalControllerBase
 
         await _db.SaveChangesAsync(cancellationToken);
 
-        var detail = await ProjectDetail(_db.Teachers.AsNoTracking().Where(t => t.Id == id))
+        var detail = await ProjectDetail(SchoolTeachers(_db.Teachers.AsNoTracking()).Where(t => t.Id == id))
             .FirstAsync(cancellationToken);
 
         return Ok(detail);
@@ -528,7 +532,7 @@ public class TeachersController : PortalControllerBase
         SetActiveRequest request,
         CancellationToken cancellationToken)
     {
-        var teacher = await _db.Teachers
+        var teacher = await SchoolTeachers(_db.Teachers)
             .Include(t => t.User)
             .Include(t => t.TeacherSubjects)
             .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
@@ -552,7 +556,7 @@ public class TeachersController : PortalControllerBase
 
         await _db.SaveChangesAsync(cancellationToken);
 
-        var detail = await ProjectDetail(_db.Teachers.AsNoTracking().Where(t => t.Id == id))
+        var detail = await ProjectDetail(SchoolTeachers(_db.Teachers.AsNoTracking()).Where(t => t.Id == id))
             .FirstAsync(cancellationToken);
 
         return Ok(detail);
@@ -567,7 +571,7 @@ public class TeachersController : PortalControllerBase
         int id,
         CancellationToken cancellationToken)
     {
-        var teacher = await _db.Teachers
+        var teacher = await SchoolTeachers(_db.Teachers)
             .AsNoTracking()
             .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
 
@@ -620,7 +624,7 @@ public class TeachersController : PortalControllerBase
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> DeleteTeacher(int id, CancellationToken cancellationToken)
     {
-        var teacher = await _db.Teachers.FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
+        var teacher = await SchoolTeachers(_db.Teachers).FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
 
         if (teacher is null)
         {
@@ -673,7 +677,7 @@ public class TeachersController : PortalControllerBase
         CreateTeachingAssignmentRequest request,
         CancellationToken cancellationToken)
     {
-        var teacher = await _db.Teachers.FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
+        var teacher = await SchoolTeachers(_db.Teachers).FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
 
         if (teacher is null)
         {
@@ -690,6 +694,21 @@ public class TeachersController : PortalControllerBase
         {
             ModelState.AddModelError(nameof(request.SectionId), "Unknown or inactive section.");
             return ValidationProblem(ModelState);
+        }
+
+        var subjectGradeLevelId = await _db.Subjects
+            .Where(subject => subject.Id == request.SubjectId)
+            .Select(subject => (int?)subject.GradeLevelId)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (subjectGradeLevelId is null || !await _db.SchoolGradeSections.AnyAsync(
+                link => link.SchoolId == CurrentSchoolId
+                    && link.GradeLevelId == subjectGradeLevelId
+                    && link.SectionId == request.SectionId,
+                cancellationToken))
+        {
+            return BadRequestProblem(
+                "Class is not configured",
+                "The selected subject and section are not configured for your school.");
         }
 
         var academicYear = await _settings.GetAcademicYearAsync(cancellationToken);
@@ -756,7 +775,11 @@ public class TeachersController : PortalControllerBase
         CancellationToken cancellationToken)
     {
         var assignment = await _db.TeacherSubjects
-            .FirstOrDefaultAsync(ts => ts.Id == assignmentId && ts.TeacherId == id, cancellationToken);
+            .FirstOrDefaultAsync(ts => ts.Id == assignmentId
+                && ts.TeacherId == id
+                && ts.Teacher!.User != null
+                && ts.Teacher.User.SchoolId == CurrentSchoolId,
+                cancellationToken);
 
         if (assignment is null)
         {
@@ -793,7 +816,10 @@ public class TeachersController : PortalControllerBase
         CancellationToken cancellationToken)
     {
         var assignment = await _db.TeacherSubjects
-            .FirstOrDefaultAsync(ts => ts.Id == assignmentId, cancellationToken);
+            .FirstOrDefaultAsync(ts => ts.Id == assignmentId
+                && ts.Teacher!.User != null
+                && ts.Teacher.User.SchoolId == CurrentSchoolId,
+                cancellationToken);
 
         if (assignment is null)
         {
@@ -807,7 +833,11 @@ public class TeachersController : PortalControllerBase
 
         var teacher = await _db.Teachers
             .AsNoTracking()
-            .AnyAsync(t => t.Id == request.TeacherId && t.IsActive, cancellationToken);
+            .AnyAsync(t => t.Id == request.TeacherId
+                && t.IsActive
+                && t.User != null
+                && t.User.SchoolId == CurrentSchoolId,
+                cancellationToken);
 
         if (!teacher)
         {
@@ -839,7 +869,7 @@ public class TeachersController : PortalControllerBase
         return Ok(response);
     }
 
-    private static IQueryable<TeacherDetailResponse> ProjectDetail(IQueryable<Teacher> query) =>
+    private IQueryable<TeacherDetailResponse> ProjectDetail(IQueryable<Teacher> query) =>
         query.Select(t => new TeacherDetailResponse
         {
             Id = t.Id,
@@ -871,13 +901,16 @@ public class TeachersController : PortalControllerBase
                     SectionName = ts.Section!.Name,
                     AcademicYear = ts.AcademicYear,
                     IsActive = ts.IsActive,
-                    StudentCount = ts.Section.Students.Count(
-                        st => st.IsActive && st.GradeLevelId == ts.Subject.GradeLevelId)
+                    StudentCount = ts.Section.Students.Count(st =>
+                        st.IsActive
+                        && st.GradeLevelId == ts.Subject.GradeLevelId
+                        && st.User != null
+                        && st.User.SchoolId == CurrentSchoolId)
                 })
                 .ToList()
         });
 
-    private static IQueryable<TeachingAssignmentResponse> ProjectAssignments(IQueryable<TeacherSubject> query) =>
+    private IQueryable<TeachingAssignmentResponse> ProjectAssignments(IQueryable<TeacherSubject> query) =>
         query.Select(ts => new TeachingAssignmentResponse
         {
             Id = ts.Id,
@@ -892,7 +925,13 @@ public class TeachersController : PortalControllerBase
             SectionName = ts.Section!.Name,
             AcademicYear = ts.AcademicYear,
             IsActive = ts.IsActive,
-            StudentCount = ts.Section.Students.Count(
-                st => st.IsActive && st.GradeLevelId == ts.Subject.GradeLevelId)
+            StudentCount = ts.Section.Students.Count(st =>
+                st.IsActive
+                && st.GradeLevelId == ts.Subject.GradeLevelId
+                && st.User != null
+                && st.User.SchoolId == CurrentSchoolId)
         });
+
+    private IQueryable<Teacher> SchoolTeachers(IQueryable<Teacher> query) =>
+        query.Where(teacher => teacher.User != null && teacher.User.SchoolId == CurrentSchoolId);
 }

@@ -1,4 +1,5 @@
 using HaladeHighSchool.Api.Data;
+using HaladeHighSchool.Api.Configuration;
 using HaladeHighSchool.Api.DTOs;
 using HaladeHighSchool.Api.Models;
 using HaladeHighSchool.Api.Services;
@@ -60,6 +61,14 @@ public class AuthController : ControllerBase
         var signIn = await _signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
 
         if (!signIn.Succeeded || signIn.IsLockedOut || !user.IsActive)
+        {
+            return InvalidCredentials();
+        }
+
+        if (!await _userManager.IsInRoleAsync(user, Roles.SuperAdmin)
+            && !await _db.Schools.AnyAsync(
+                school => school.Id == user.SchoolId && school.IsActive,
+                cancellationToken))
         {
             return InvalidCredentials();
         }

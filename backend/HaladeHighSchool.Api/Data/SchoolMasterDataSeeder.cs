@@ -63,12 +63,17 @@ public static class SchoolMasterDataSeeder
             .FirstOrDefaultAsync(school => school.Id == School.DefaultSchoolId, cancellationToken);
         if (existingSchool is not null)
         {
+            if (string.IsNullOrWhiteSpace(existingSchool.Slug))
+            {
+                existingSchool.Slug = $"school-management-system-{existingSchool.Id.ToString("N")[..8]}";
+            }
+
             if (string.IsNullOrWhiteSpace(existingSchool.Code))
             {
                 existingSchool.Code = "DEFAULT";
-                await db.SaveChangesAsync(cancellationToken);
             }
 
+            await db.SaveChangesAsync(cancellationToken);
             return;
         }
 
@@ -76,6 +81,7 @@ public static class SchoolMasterDataSeeder
         {
             Id = School.DefaultSchoolId,
             Name = "School Management System",
+            Slug = "school-management-system",
             Code = "DEFAULT",
             ContactEmail = string.Empty,
             ContactPhone = string.Empty,

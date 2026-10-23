@@ -40,8 +40,8 @@ public class AssessmentsController : PortalControllerBase
     }
 
     /// <summary>
-    /// Assessments visible to the caller: everything for an admin, the teacher's own
-    /// subjects for a teacher, and the active assessments of their own class for a student.
+    /// Assessments are scoped to the caller's school; teachers and students receive the
+    /// additional subject/class restrictions for their role.
     /// </summary>
     [HttpGet]
     [ProducesResponseType<IEnumerable<AssessmentResponse>>(StatusCodes.Status200OK)]
@@ -53,7 +53,9 @@ public class AssessmentsController : PortalControllerBase
         [FromQuery] bool includeInactive = false,
         CancellationToken cancellationToken = default)
     {
-        var query = _db.Assessments.AsNoTracking();
+        var query = _db.Assessments
+            .AsNoTracking()
+            .Where(assessment => assessment.SchoolId == CurrentSchoolId);
 
         if (!includeInactive)
         {
@@ -75,7 +77,7 @@ public class AssessmentsController : PortalControllerBase
             query = query.Where(a => a.AssessmentType == assessmentType);
         }
 
-        if (!User.IsAdmin())
+        if (!User.IsSchoolAdministrator())
         {
             if (User.GetTeacherId() is int teacherId)
             {
@@ -115,7 +117,8 @@ public class AssessmentsController : PortalControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<AssessmentResponse>> GetAssessment(int id, CancellationToken cancellationToken)
     {
-        var assessment = await Project(_db.Assessments.AsNoTracking().Where(a => a.Id == id))
+        var assessment = await Project(_db.Assessments.AsNoTracking()
+                .Where(a => a.Id == id && a.SchoolId == CurrentSchoolId))
             .FirstOrDefaultAsync(cancellationToken);
 
         return assessment is null
@@ -125,7 +128,7 @@ public class AssessmentsController : PortalControllerBase
 
     /// <summary>Creates an assessment for a subject the caller is allowed to teach.</summary>
     [HttpPost]
-    [Authorize(Roles = Roles.AdminOrTeacher)]
+    [Authorize(Roles = Roles.AdminOrSchoolAdminOrTeacher)]
     [ProducesResponseType<AssessmentResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -135,7 +138,7 @@ public class AssessmentsController : PortalControllerBase
     {
         if (request.AssessmentType == AssessmentType.Other)
         {
-            if (!User.IsAdmin())
+            if (!User.IsSchoolAdministrator())
             {
                 return ForbiddenProblem("Only administrators may create custom assessment types.");
             }
@@ -147,7 +150,12 @@ public class AssessmentsController : PortalControllerBase
             }
         }
 
-        if (!await _db.Subjects.AnyAsync(s => s.Id == request.SubjectId && s.IsActive, cancellationToken))
+        var subject = await _db.Subjects
+            .AsNoTracking()
+            .Where(s => s.Id == request.SubjectId && s.IsActive)
+            .Select(s => new { s.Id, s.GradeLevelId })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (subject is null)
         {
             ModelState.AddModelError(nameof(request.SubjectId), "Unknown or inactive subject.");
             return ValidationProblem(ModelState);
@@ -160,6 +168,16 @@ public class AssessmentsController : PortalControllerBase
             return ValidationProblem(ModelState);
         }
 
+        var gradeAvailable = await _db.SchoolGradeSections.AnyAsync(link =>
+            link.SchoolId == CurrentSchoolId
+            && link.GradeLevelId == subject.GradeLevelId
+            && (request.SectionId == null || link.SectionId == request.SectionId),
+            cancellationToken);
+        if (!gradeAvailable)
+        {
+            return ForbiddenProblem("The subject grade or section is not configured for your school.");
+        }
+
         if (await AuthoriseSubjectAsync(request.SubjectId, request.SectionId, cancellationToken) is { } denial)
         {
             return denial;
@@ -167,6 +185,7 @@ public class AssessmentsController : PortalControllerBase
 
         var assessment = new Assessment
         {
+            SchoolId = CurrentSchoolId,
             Title = request.AssessmentType == AssessmentType.Other
                 ? request.CustomTypeTitle!.Trim()
                 : request.Title.Trim(),
@@ -187,7 +206,8 @@ public class AssessmentsController : PortalControllerBase
         _db.Assessments.Add(assessment);
         await _db.SaveChangesAsync(cancellationToken);
 
-        var created = await Project(_db.Assessments.AsNoTracking().Where(a => a.Id == assessment.Id))
+        var created = await Project(_db.Assessments.AsNoTracking()
+                .Where(a => a.Id == assessment.Id && a.SchoolId == CurrentSchoolId))
             .FirstAsync(cancellationToken);
 
         _logger.LogInformation(
@@ -204,7 +224,7 @@ public class AssessmentsController : PortalControllerBase
     /// been entered, which the database trigger would reject anyway.
     /// </summary>
     [HttpPut("{id:int}")]
-    [Authorize(Roles = Roles.AdminOrTeacher)]
+    [Authorize(Roles = Roles.AdminOrSchoolAdminOrTeacher)]
     [ProducesResponseType<AssessmentResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -214,7 +234,9 @@ public class AssessmentsController : PortalControllerBase
         UpdateAssessmentRequest request,
         CancellationToken cancellationToken)
     {
-        var assessment = await _db.Assessments.FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
+        var assessment = await _db.Assessments.FirstOrDefaultAsync(
+            a => a.Id == id && a.SchoolId == CurrentSchoolId,
+            cancellationToken);
 
         if (assessment is null)
         {
@@ -227,7 +249,8 @@ public class AssessmentsController : PortalControllerBase
         }
 
         var updatedType = request.AssessmentType ?? assessment.AssessmentType;
-        if ((updatedType == AssessmentType.Other || assessment.AssessmentType == AssessmentType.Other) && !User.IsAdmin())
+        if ((updatedType == AssessmentType.Other || assessment.AssessmentType == AssessmentType.Other)
+            && !User.IsSchoolAdministrator())
         {
             return ForbiddenProblem("Only administrators may create or edit custom assessment types.");
         }
@@ -241,7 +264,7 @@ public class AssessmentsController : PortalControllerBase
         if (request.MaxScore < assessment.MaxScore)
         {
             var highestMark = await _db.Marks
-                .Where(m => m.AssessmentId == id)
+                .Where(m => m.AssessmentId == id && m.SchoolId == CurrentSchoolId)
                 .Select(m => (decimal?)m.Score)
                 .MaxAsync(cancellationToken);
 
@@ -266,7 +289,8 @@ public class AssessmentsController : PortalControllerBase
 
         await _db.SaveChangesAsync(cancellationToken);
 
-        var updated = await Project(_db.Assessments.AsNoTracking().Where(a => a.Id == id))
+        var updated = await Project(_db.Assessments.AsNoTracking()
+                .Where(a => a.Id == id && a.SchoolId == CurrentSchoolId))
             .FirstAsync(cancellationToken);
 
         return Ok(await WithWeightAsync(updated, cancellationToken));
@@ -277,14 +301,16 @@ public class AssessmentsController : PortalControllerBase
     /// cascades and would silently delete the students' scores.
     /// </summary>
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = Roles.AdminOrTeacher)]
+    [Authorize(Roles = Roles.AdminOrSchoolAdminOrTeacher)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> DeleteAssessment(int id, CancellationToken cancellationToken)
     {
-        var assessment = await _db.Assessments.FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
+        var assessment = await _db.Assessments.FirstOrDefaultAsync(
+            a => a.Id == id && a.SchoolId == CurrentSchoolId,
+            cancellationToken);
 
         if (assessment is null)
         {
@@ -296,7 +322,9 @@ public class AssessmentsController : PortalControllerBase
             return denial;
         }
 
-        var markCount = await _db.Marks.CountAsync(m => m.AssessmentId == id, cancellationToken);
+        var markCount = await _db.Marks.CountAsync(
+            m => m.AssessmentId == id && m.SchoolId == CurrentSchoolId,
+            cancellationToken);
         if (markCount > 0)
         {
             return ConflictProblem(
@@ -316,15 +344,41 @@ public class AssessmentsController : PortalControllerBase
         int? sectionId,
         CancellationToken cancellationToken)
     {
-        if (User.IsAdmin())
+        if (User.IsSchoolAdministrator())
         {
-            return null;
+            var gradeLevelId = await _db.Subjects
+                .AsNoTracking()
+                .Where(subject => subject.Id == subjectId)
+                .Select(subject => (int?)subject.GradeLevelId)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (gradeLevelId is null)
+            {
+                return ForbiddenProblem("The requested subject is unavailable.");
+            }
+
+            var isConfigured = await _db.SchoolGradeSections.AnyAsync(link =>
+                link.SchoolId == CurrentSchoolId
+                && link.GradeLevelId == gradeLevelId.Value
+                && (sectionId == null || link.SectionId == sectionId),
+                cancellationToken);
+            return isConfigured
+                ? null
+                : ForbiddenProblem("The subject grade or section is not configured for your school.");
         }
 
         var teacherId = User.GetTeacherId();
         if (teacherId is null)
         {
             return ForbiddenProblem("Your account is not linked to a teacher profile.");
+        }
+
+        if (!await _db.Teachers.AnyAsync(
+                teacher => teacher.Id == teacherId.Value
+                    && teacher.User != null
+                    && teacher.User.SchoolId == CurrentSchoolId,
+                cancellationToken))
+        {
+            return ForbiddenProblem("Your teacher profile is not assigned to this school.");
         }
 
         return await _assignments.IsAssignedAsync(teacherId.Value, subjectId, sectionId, cancellationToken)

@@ -12,7 +12,7 @@ namespace HaladeHighSchool.Api.Controllers;
 /// <summary>Administrator-only listing and access management for portal accounts.</summary>
 [ApiController]
 [Route("api/admin/users")]
-[Authorize(Roles = Roles.Admin)]
+[Authorize(Roles = Roles.AdminOrSchoolAdmin)]
 [Produces("application/json")]
 public sealed class AdminUsersController : PortalControllerBase
 {
@@ -37,6 +37,7 @@ public sealed class AdminUsersController : PortalControllerBase
         CancellationToken cancellationToken)
     {
         var users = await _userManager.Users
+            .Where(user => user.SchoolId == CurrentSchoolId)
             .OrderBy(user => user.FullName)
             .ToListAsync(cancellationToken);
         var responses = new List<AdminUserResponse>(users.Count);
@@ -58,7 +59,7 @@ public sealed class AdminUsersController : PortalControllerBase
         return Ok(responses);
     }
 
-    /// <summary>Assigns the Admin role to an existing account.</summary>
+    /// <summary>Promotes an account in the current tenant to administrator.</summary>
     [HttpPost("{id}/promote")]
     [ProducesResponseType<AdminUserResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -67,7 +68,8 @@ public sealed class AdminUsersController : PortalControllerBase
         string id,
         CancellationToken cancellationToken)
     {
-        var user = await _userManager.FindByIdAsync(id);
+        var user = await _userManager.Users
+            .FirstOrDefaultAsync(candidate => candidate.Id == id && candidate.SchoolId == CurrentSchoolId, cancellationToken);
         if (user is null)
         {
             return NotFoundProblem("The requested user account was not found.");
@@ -112,7 +114,8 @@ public sealed class AdminUsersController : PortalControllerBase
         UpdateAdminUserStatusRequest request,
         CancellationToken cancellationToken)
     {
-        var user = await _userManager.FindByIdAsync(id);
+        var user = await _userManager.Users
+            .FirstOrDefaultAsync(candidate => candidate.Id == id && candidate.SchoolId == CurrentSchoolId, cancellationToken);
         if (user is null)
         {
             return NotFoundProblem("The requested user account was not found.");
@@ -124,9 +127,15 @@ public sealed class AdminUsersController : PortalControllerBase
         }
 
         var roles = await _userManager.GetRolesAsync(user);
-        if (!request.IsActive && roles.Contains(Roles.Admin, StringComparer.OrdinalIgnoreCase))
+        if (!request.IsActive &&
+            (roles.Contains(Roles.Admin, StringComparer.OrdinalIgnoreCase)
+             || roles.Contains(Roles.SchoolAdmin, StringComparer.OrdinalIgnoreCase)))
         {
-            var admins = await _userManager.GetUsersInRoleAsync(Roles.Admin);
+            var admins = (await _userManager.GetUsersInRoleAsync(Roles.Admin))
+                .Concat(await _userManager.GetUsersInRoleAsync(Roles.SchoolAdmin))
+                .Where(admin => admin.SchoolId == CurrentSchoolId)
+                .DistinctBy(admin => admin.Id)
+                .ToList();
             var activeAdminCount = admins.Count(admin => admin.IsActive);
             if (user.IsActive && activeAdminCount <= 1)
             {

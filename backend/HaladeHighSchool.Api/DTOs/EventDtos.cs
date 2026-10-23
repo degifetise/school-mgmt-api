@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using HaladeHighSchool.Api.Models;
+using Microsoft.AspNetCore.Http;
 
 namespace HaladeHighSchool.Api.DTOs;
 
@@ -9,6 +10,7 @@ public record EventDto
     public string Title { get; init; } = string.Empty;
     public string? Description { get; init; }
     public string? BannerUrl { get; init; }
+    public IReadOnlyList<string> ImageUrls { get; init; } = [];
     public string Category { get; init; } = "General";
     public string? Location { get; init; }
     public string? Organizer { get; init; }
@@ -32,6 +34,7 @@ public record CreateEventDto
     public string Title { get; init; } = string.Empty;
     public string? Description { get; init; }
     public string? BannerUrl { get; init; }
+    public List<IFormFile> Images { get; init; } = [];
     public string Category { get; init; } = "General";
     public string? Location { get; init; }
     public string? Organizer { get; init; }
@@ -43,9 +46,9 @@ public record CreateEventDto
     [RegularExpression("^(All|Students|Teachers)$")]
     public string TargetStakeholders { get; init; } = "All";
 
-    public IReadOnlyList<int> TargetGradeIds { get; init; } = [];
+    public List<int> TargetGradeIds { get; init; } = [];
 
-    public IReadOnlyList<int> TargetSectionIds { get; init; } = [];
+    public List<int> TargetSectionIds { get; init; } = [];
 }
 
 public record UpdateEventDto : CreateEventDto

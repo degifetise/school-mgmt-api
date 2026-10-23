@@ -16,6 +16,21 @@ function toMultipartFormData(payload) {
   return formData;
 }
 
+function toEventFormData(payload) {
+  const formData = new FormData();
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value === null || value === undefined || value === '') return;
+    if (Array.isArray(value)) {
+      value.forEach((item) => formData.append(key, item));
+    } else if (value instanceof File) {
+      formData.append(key, value);
+    } else {
+      formData.append(key, String(value));
+    }
+  });
+  return formData;
+}
+
 async function downloadPdf(path, fallbackFilename) {
   let response;
   try {
@@ -56,9 +71,14 @@ export const reportPdfApi = {
   parentStudentReportCard: (studentId) =>
     downloadPdf(`/api/parent/student/${studentId}/report-card-pdf`, `report-card-${studentId}.pdf`),
   studentsRoster: (params = {}) =>
-    downloadPdf(`/api/admin/reports/students/pdf${params.gradeLevelId || params.sectionId
-      ? `?${new URLSearchParams(Object.entries(params).filter(([, value]) => value)).toString()}`
-      : ''}`, 'students-roster.pdf'),
+    downloadPdf(
+      `/api/admin/reports/students/pdf${
+        params.gradeLevelId || params.sectionId
+          ? `?${new URLSearchParams(Object.entries(params).filter(([, value]) => value)).toString()}`
+          : ''
+      }`,
+      'students-roster.pdf'
+    ),
   teachersRoster: () => downloadPdf('/api/admin/reports/teachers/pdf', 'faculty-directory.pdf'),
   teacherSectionRoster: (sectionId) =>
     downloadPdf(`/api/teacher/reports/section/${sectionId}/pdf`, `section-${sectionId}-roster.pdf`),
@@ -67,10 +87,29 @@ export const reportPdfApi = {
 export const schoolApi = {
   /** Anonymous: used by the login screen and the dashboard header. */
   getInfo: () => unwrap(api.get('/api/system-settings/school-info')),
+  getBrandingSettings: () => unwrap(api.get('/api/systemsettings/school-settings')),
+  updateBrandingSettings: (payload) =>
+    unwrap(api.put('/api/systemsettings/school-settings', payload)),
+  getRegistrationInfo: (slug) =>
+    unwrap(api.get(`/api/public/schools/slug/${encodeURIComponent(slug)}`)),
+  registerBySlug: (slug, payload) =>
+    unwrap(api.post(`/api/public/schools/slug/${encodeURIComponent(slug)}/register`, payload)),
+  getTenant: (schoolId) => unwrap(api.get(`/api/admin/schools/${encodeURIComponent(schoolId)}`)),
+  updateName: (schoolId, name) =>
+    unwrap(api.put(`/api/admin/schools/${encodeURIComponent(schoolId)}`, { name })),
 };
 
 export const superAdminSchoolApi = {
+  list: () => unwrap(api.get('/api/superadmin/schools')),
   create: (payload) => unwrap(api.post('/api/superadmin/schools', payload)),
+  updateName: (schoolId, name) =>
+    unwrap(api.put(`/api/superadmin/schools/${encodeURIComponent(schoolId)}`, { name })),
+  toggleStatus: (schoolId) =>
+    unwrap(api.post(`/api/superadmin/schools/${encodeURIComponent(schoolId)}/toggle-status`)),
+  assignAdmin: (schoolId, email) =>
+    unwrap(api.post(`/api/superadmin/schools/${encodeURIComponent(schoolId)}/admin`, { email })),
+  unassignAdmin: (schoolId) =>
+    unwrap(api.delete(`/api/superadmin/schools/${encodeURIComponent(schoolId)}/admin`)),
 };
 
 /** The anonymous surface behind the Home, About and Explore events pages. */
@@ -82,19 +121,21 @@ export const publicApi = {
 export const eventApi = {
   list: (params = {}) => unwrap(api.get('/api/v1/events', { params })),
   get: (id) => unwrap(api.get(`/api/v1/events/${id}`)),
-  create: (payload) => unwrap(api.post('/api/v1/events', payload)),
-  update: (id, payload) => unwrap(api.put(`/api/v1/events/${id}`, payload)),
+  create: (payload) => unwrap(api.post('/api/v1/events', toEventFormData(payload))),
+  update: (id, payload) => unwrap(api.put(`/api/v1/events/${id}`, toEventFormData(payload))),
   updateStatus: (id, status) => unwrap(api.patch(`/api/v1/events/${id}/status`, { status })),
   remove: (id) => unwrap(api.delete(`/api/v1/events/${id}`)),
   register: (id, studentId) => unwrap(api.post(`/api/v1/events/${id}/register`, { studentId })),
-  cancelRegistration: (id, studentId) => unwrap(api.post(`/api/v1/events/${id}/cancel-registration`, { studentId })),
+  cancelRegistration: (id, studentId) =>
+    unwrap(api.post(`/api/v1/events/${id}/cancel-registration`, { studentId })),
   registrations: (id) => unwrap(api.get(`/api/v1/events/${id}/registrations`)),
   comments: (id) => unwrap(api.get(`/api/events/${id}/comments`)),
   addComment: (id, commentText, parentCommentId = null) =>
     unwrap(api.post(`/api/events/${id}/comments`, { commentText, parentCommentId })),
   replyToComment: (id, parentCommentId, commentText) =>
     unwrap(api.post(`/api/events/${id}/comments/reply`, { parentCommentId, commentText })),
-  dashboardStats: (count = 5) => unwrap(api.get('/api/v1/events/dashboard/stats', { params: { count } })),
+  dashboardStats: (count = 5) =>
+    unwrap(api.get('/api/v1/events/dashboard/stats', { params: { count } })),
 };
 
 export const healthApi = {
@@ -131,8 +172,10 @@ export const authApi = {
 };
 
 export const smartIdApi = {
-  cardDetails: (userId) => unwrap(api.get(`/api/smart-id/card-details/${encodeURIComponent(userId)}`)),
-  paymentStatus: (userId) => unwrap(api.get(`/api/smart-id/payment-status/${encodeURIComponent(userId)}`)),
+  cardDetails: (userId) =>
+    unwrap(api.get(`/api/smart-id/card-details/${encodeURIComponent(userId)}`)),
+  paymentStatus: (userId) =>
+    unwrap(api.get(`/api/smart-id/payment-status/${encodeURIComponent(userId)}`)),
   adminLookup: (identifier) =>
     unwrap(api.get(`/api/smart-id/admin/users/${encodeURIComponent(identifier)}`)),
   adminCards: (params = {}) => unwrap(api.get('/api/smart-id/admin/cards', { params })),
@@ -188,7 +231,8 @@ export const guardianApi = {
   registerParent: (payload) => unwrap(api.post('/api/admin/register-parent', payload)),
   linkStudent: (payload) => unwrap(api.post('/api/admin/guardians/link-student', payload)),
   updateLink: (payload) => unwrap(api.put('/api/admin/guardians/update-link', payload)),
-  unlinkStudent: (guardianId, studentId) => unwrap(api.delete(`/api/admin/guardians/${guardianId}/students/${studentId}`)),
+  unlinkStudent: (guardianId, studentId) =>
+    unwrap(api.delete(`/api/admin/guardians/${guardianId}/students/${studentId}`)),
   myStudents: () => unwrap(api.get('/api/parent/my-students')),
   studentAttendance: (studentId) => unwrap(api.get(`/api/parent/student/${studentId}/attendance`)),
   studentResults: (studentId) => unwrap(api.get(`/api/parent/student/${studentId}/results`)),
@@ -239,7 +283,8 @@ export const teacherApi = {
   create: (payload) => unwrap(api.post('/api/teachers/with-photo', toMultipartFormData(payload))),
   setStatus: (id, isActive) => unwrap(api.put(`/api/teachers/${id}/status`, { isActive })),
   resetPassword: (id) => unwrap(api.post(`/api/teachers/${id}/reset-password`)),
-  assign: (teacherId, payload) => unwrap(api.post(`/api/teachers/${teacherId}/assignments`, payload)),
+  assign: (teacherId, payload) =>
+    unwrap(api.post(`/api/teachers/${teacherId}/assignments`, payload)),
   removeAssignment: (teacherId, assignmentId) =>
     unwrap(api.delete(`/api/teachers/${teacherId}/assignments/${assignmentId}`)),
   reassignAssignment: (assignmentId, teacherId) =>

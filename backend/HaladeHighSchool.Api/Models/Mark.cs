@@ -9,6 +9,8 @@ public class Mark
 {
     public int Id { get; set; }
 
+    public Guid SchoolId { get; set; }
+
     public int StudentId { get; set; }
 
     public int SubjectId { get; set; }
@@ -36,4 +38,6 @@ public class Mark
     public Assessment? Assessment { get; set; }
 
     public Teacher? EnteredByTeacher { get; set; }
+
+    public School? School { get; set; }
 }

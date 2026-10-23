@@ -14,7 +14,7 @@ namespace HaladeHighSchool.Api.Controllers;
 [Route("api/admin/registration-requests")]
 [Authorize(Roles = Roles.Admin)]
 [Produces("application/json")]
-public class RegistrationRequestsController : ControllerBase
+public class RegistrationRequestsController : PortalControllerBase
 {
     private readonly IRegistrationRequestService _registrations;
     private readonly ILogger<RegistrationRequestsController> _logger;
@@ -58,7 +58,7 @@ public class RegistrationRequestsController : ControllerBase
 
         try
         {
-            return Ok(await _registrations.ListAsync(requested, cancellationToken));
+            return Ok(await _registrations.ListAsync(requested, cancellationToken, CurrentSchoolId));
         }
         catch (Exception ex)
         {
@@ -98,7 +98,8 @@ public class RegistrationRequestsController : ControllerBase
                 return Unauthorized();
             }
 
-            var result = await _registrations.ApproveAsync(id, request?.Note, reviewerId, cancellationToken);
+            var result = await _registrations.ApproveAsync(
+                id, request?.Note, reviewerId, cancellationToken, schoolId: CurrentSchoolId);
 
             return result.Succeeded && result.Value is not null
                 ? Ok(result.Value)
@@ -148,7 +149,9 @@ public class RegistrationRequestsController : ControllerBase
         }
 
         var result = await _registrations.ApproveAsync(
-            id, request?.Note, reviewerId, cancellationToken, studentOnly: true);
+            id, request?.Note, reviewerId, cancellationToken,
+            studentOnly: true,
+            schoolId: CurrentSchoolId);
 
         return result.Succeeded && result.Value is not null
             ? Ok(result.Value)
@@ -174,7 +177,8 @@ public class RegistrationRequestsController : ControllerBase
             return Unauthorized();
         }
 
-        var result = await _registrations.RejectAsync(id, request?.Note, reviewerId, cancellationToken);
+        var result = await _registrations.RejectAsync(
+            id, request?.Note, reviewerId, cancellationToken, CurrentSchoolId);
 
         return result.Succeeded && result.Value is not null
             ? Ok(result.Value)
