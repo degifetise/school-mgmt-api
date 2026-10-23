@@ -4,6 +4,8 @@ public class Assessment
 {
     public int Id { get; set; }
 
+    public Guid SchoolId { get; set; }
+
     public string Title { get; set; } = string.Empty;
 
     public AssessmentType AssessmentType { get; set; }
@@ -32,6 +34,8 @@ public class Assessment
     public Section? Section { get; set; }
 
     public Teacher? Teacher { get; set; }
+
+    public School? School { get; set; }
 
     public ICollection<Mark> Marks { get; set; } = new List<Mark>();
 }

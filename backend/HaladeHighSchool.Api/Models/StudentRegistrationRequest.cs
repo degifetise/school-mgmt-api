@@ -27,6 +27,10 @@ public class StudentRegistrationRequest
 {
     public int Id { get; set; }
 
+    public Guid SchoolId { get; set; } = School.DefaultSchoolId;
+
+    public School? School { get; set; }
+
     public string FullName { get; set; } = string.Empty;
 
     /// <summary>

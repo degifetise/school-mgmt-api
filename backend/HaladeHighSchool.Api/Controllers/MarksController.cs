@@ -11,8 +11,8 @@ namespace HaladeHighSchool.Api.Controllers;
 
 /// <summary>
 /// Mark entry for teachers and read-only published results for students.
-/// A teacher may only touch marks for a subject/section pair they are assigned to in
-/// TeacherSubjects; administrators are not restricted.
+/// Teachers may only touch marks for assigned subject/section pairs. All data operations
+/// are additionally constrained to the tenant in the caller's school claim.
 /// </summary>
 [ApiController]
 [Route("api/marks")]
@@ -52,7 +52,7 @@ public class MarksController : PortalControllerBase
     /// current score, or null where no mark has been entered yet.
     /// </summary>
     [HttpGet("assessment/{assessmentId:int}")]
-    [Authorize(Roles = Roles.AdminOrTeacher)]
+    [Authorize(Roles = Roles.AdminOrSchoolAdminOrTeacher)]
     [ProducesResponseType<GradebookResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -64,7 +64,9 @@ public class MarksController : PortalControllerBase
             .AsNoTracking()
             .Include(a => a.Subject)
             .Include(a => a.Section)
-            .FirstOrDefaultAsync(a => a.Id == assessmentId, cancellationToken);
+            .FirstOrDefaultAsync(
+                a => a.Id == assessmentId && a.SchoolId == CurrentSchoolId,
+                cancellationToken);
 
         if (assessment?.Subject is null)
         {
@@ -92,7 +94,7 @@ public class MarksController : PortalControllerBase
 
         var marks = await _db.Marks
             .AsNoTracking()
-            .Where(m => m.AssessmentId == assessmentId)
+            .Where(m => m.AssessmentId == assessmentId && m.SchoolId == CurrentSchoolId)
             .ToDictionaryAsync(m => m.StudentId, cancellationToken);
 
         var rows = students.Select(s =>
@@ -131,7 +133,7 @@ public class MarksController : PortalControllerBase
 
     /// <summary>Creates or overwrites a single student's score for an assessment.</summary>
     [HttpPost]
-    [Authorize(Roles = Roles.AdminOrTeacher)]
+    [Authorize(Roles = Roles.AdminOrSchoolAdminOrTeacher)]
     [ProducesResponseType<MarkResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<MarkResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -142,7 +144,9 @@ public class MarksController : PortalControllerBase
     {
         var assessment = await _db.Assessments
             .Include(a => a.Subject)
-            .FirstOrDefaultAsync(a => a.Id == request.AssessmentId, cancellationToken);
+            .FirstOrDefaultAsync(
+                a => a.Id == request.AssessmentId && a.SchoolId == CurrentSchoolId,
+                cancellationToken);
 
         if (assessment?.Subject is null)
         {
@@ -181,7 +185,9 @@ public class MarksController : PortalControllerBase
 
         var existing = await _db.Marks
             .FirstOrDefaultAsync(
-                m => m.StudentId == request.StudentId && m.AssessmentId == request.AssessmentId,
+                m => m.StudentId == request.StudentId
+                    && m.AssessmentId == request.AssessmentId
+                    && m.SchoolId == CurrentSchoolId,
                 cancellationToken);
 
         var isNew = existing is null;
@@ -192,6 +198,7 @@ public class MarksController : PortalControllerBase
         {
             existing = new Mark
             {
+                SchoolId = CurrentSchoolId,
                 StudentId = request.StudentId,
                 AssessmentId = request.AssessmentId,
                 // Taken from the assessment: the database trigger rejects any mismatch.
@@ -227,7 +234,7 @@ public class MarksController : PortalControllerBase
 
     /// <summary>Enters or corrects scores for a whole class in one request.</summary>
     [HttpPost("bulk")]
-    [Authorize(Roles = Roles.AdminOrTeacher)]
+    [Authorize(Roles = Roles.AdminOrSchoolAdminOrTeacher)]
     [ProducesResponseType<BulkMarkResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -237,7 +244,9 @@ public class MarksController : PortalControllerBase
     {
         var assessment = await _db.Assessments
             .Include(a => a.Subject)
-            .FirstOrDefaultAsync(a => a.Id == request.AssessmentId, cancellationToken);
+            .FirstOrDefaultAsync(
+                a => a.Id == request.AssessmentId && a.SchoolId == CurrentSchoolId,
+                cancellationToken);
 
         if (assessment?.Subject is null)
         {
@@ -295,7 +304,9 @@ public class MarksController : PortalControllerBase
         }
 
         var existingMarks = await _db.Marks
-            .Where(m => m.AssessmentId == request.AssessmentId && requestedIds.Contains(m.StudentId))
+            .Where(m => m.SchoolId == CurrentSchoolId
+                && m.AssessmentId == request.AssessmentId
+                && requestedIds.Contains(m.StudentId))
             .ToDictionaryAsync(m => m.StudentId, cancellationToken);
         var newlyPublishedStudentIds = request.IsPublished
             ? request.Entries
@@ -323,6 +334,7 @@ public class MarksController : PortalControllerBase
             {
                 var newMark = new Mark
                 {
+                    SchoolId = CurrentSchoolId,
                     StudentId = entry.StudentId,
                     AssessmentId = request.AssessmentId,
                     SubjectId = assessment.SubjectId,
@@ -359,7 +371,7 @@ public class MarksController : PortalControllerBase
 
     /// <summary>Corrects an existing mark.</summary>
     [HttpPut("{id:int}")]
-    [Authorize(Roles = Roles.AdminOrTeacher)]
+    [Authorize(Roles = Roles.AdminOrSchoolAdminOrTeacher)]
     [ProducesResponseType<MarkResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -371,7 +383,9 @@ public class MarksController : PortalControllerBase
     {
         var mark = await _db.Marks
             .Include(m => m.Assessment)
-            .FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
+            .FirstOrDefaultAsync(
+                m => m.Id == id && m.SchoolId == CurrentSchoolId,
+                cancellationToken);
 
         if (mark?.Assessment is null)
         {
@@ -412,7 +426,7 @@ public class MarksController : PortalControllerBase
 
     /// <summary>Publishes or unpublishes every mark for an assessment in one operation.</summary>
     [HttpPut("assessment/{assessmentId:int}/publish")]
-    [Authorize(Roles = Roles.AdminOrTeacher)]
+    [Authorize(Roles = Roles.AdminOrSchoolAdminOrTeacher)]
     [ProducesResponseType<PublishMarksResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -423,7 +437,9 @@ public class MarksController : PortalControllerBase
     {
         var assessment = await _db.Assessments
             .AsNoTracking()
-            .FirstOrDefaultAsync(a => a.Id == assessmentId, cancellationToken);
+            .FirstOrDefaultAsync(
+                a => a.Id == assessmentId && a.SchoolId == CurrentSchoolId,
+                cancellationToken);
 
         if (assessment is null)
         {
@@ -439,12 +455,15 @@ public class MarksController : PortalControllerBase
         var newlyPublishedStudentIds = request.IsPublished
             ? await _db.Marks.AsNoTracking()
                 .Where(mark => mark.AssessmentId == assessmentId && !mark.IsPublished)
+                .Where(mark => mark.SchoolId == CurrentSchoolId)
                 .Select(mark => mark.StudentId)
                 .ToListAsync(cancellationToken)
             : [];
 
         var affected = await _db.Marks
-            .Where(m => m.AssessmentId == assessmentId && m.IsPublished != request.IsPublished)
+            .Where(m => m.SchoolId == CurrentSchoolId
+                && m.AssessmentId == assessmentId
+                && m.IsPublished != request.IsPublished)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(m => m.IsPublished, request.IsPublished)
                 .SetProperty(m => m.PublishedAt, publishedAt)
@@ -471,7 +490,7 @@ public class MarksController : PortalControllerBase
 
     /// <summary>Deletes a mark, for example when it was entered against the wrong student.</summary>
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = Roles.AdminOrTeacher)]
+    [Authorize(Roles = Roles.AdminOrSchoolAdminOrTeacher)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -479,7 +498,9 @@ public class MarksController : PortalControllerBase
     {
         var mark = await _db.Marks
             .Include(m => m.Assessment)
-            .FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
+            .FirstOrDefaultAsync(
+                m => m.Id == id && m.SchoolId == CurrentSchoolId,
+                cancellationToken);
 
         if (mark?.Assessment is null)
         {
@@ -499,7 +520,7 @@ public class MarksController : PortalControllerBase
 
     /// <summary>Returns a single mark.</summary>
     [HttpGet("{id:int}")]
-    [Authorize(Roles = Roles.AdminOrTeacher)]
+    [Authorize(Roles = Roles.AdminOrSchoolAdminOrTeacher)]
     [ProducesResponseType<MarkResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<MarkResponse>> GetMark(int id, CancellationToken cancellationToken)
@@ -536,14 +557,15 @@ public class MarksController : PortalControllerBase
 
     /// <summary>All marks for one student, including unpublished ones.</summary>
     [HttpGet("student/{studentId:int}")]
-    [Authorize(Roles = Roles.AdminOrTeacher)]
+    [Authorize(Roles = Roles.AdminOrSchoolAdminOrTeacher)]
     [ProducesResponseType<IEnumerable<MarkResponse>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<MarkResponse>>> GetStudentMarks(
         int studentId,
         [FromQuery] int? subjectId,
         CancellationToken cancellationToken)
     {
-        var query = _db.Marks.AsNoTracking().Where(m => m.StudentId == studentId);
+        var query = _db.Marks.AsNoTracking()
+            .Where(m => m.StudentId == studentId && m.SchoolId == CurrentSchoolId);
 
         if (subjectId is int subject)
         {
@@ -560,13 +582,22 @@ public class MarksController : PortalControllerBase
 
     /// <summary>Weighted report card for any student.</summary>
     [HttpGet("student/{studentId:int}/report-card")]
-    [Authorize(Roles = Roles.AdminOrTeacher)]
+    [Authorize(Roles = Roles.AdminOrSchoolAdminOrTeacher)]
     [ProducesResponseType<ReportCardResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ReportCardResponse>> GetStudentReportCard(
         int studentId,
         CancellationToken cancellationToken)
     {
+        if (!await _db.Students.AnyAsync(
+                student => student.Id == studentId
+                    && student.User != null
+                    && student.User.SchoolId == CurrentSchoolId,
+                cancellationToken))
+        {
+            return NotFoundProblem($"Student {studentId} was not found.");
+        }
+
         var reportCard = await _reportCards.BuildAsync(studentId, cancellationToken);
         return reportCard is null
             ? NotFoundProblem($"Student {studentId} was not found.")
@@ -594,9 +625,11 @@ public class MarksController : PortalControllerBase
         Assessment assessment,
         CancellationToken cancellationToken)
     {
-        if (User.IsAdmin())
+        if (User.IsSchoolAdministrator())
         {
-            return null;
+            return assessment.SchoolId == CurrentSchoolId
+                ? null
+                : ForbiddenProblem("The assessment does not belong to your school.");
         }
 
         var teacherId = User.GetTeacherId();
@@ -608,9 +641,15 @@ public class MarksController : PortalControllerBase
         var isAssigned = await _assignments.IsAssignedAsync(
             teacherId.Value, assessment.SubjectId, assessment.SectionId, cancellationToken);
 
-        return isAssigned
+        var teacherInSchool = await _db.Teachers.AnyAsync(
+            teacher => teacher.Id == teacherId.Value
+                && teacher.User != null
+                && teacher.User.SchoolId == CurrentSchoolId,
+            cancellationToken);
+
+        return isAssigned && teacherInSchool
             ? null
-            : ForbiddenProblem("You are not assigned to teach this subject to this section.");
+            : ForbiddenProblem("You are not assigned to teach this assessment in your school.");
     }
 
     /// <summary>
@@ -623,7 +662,10 @@ public class MarksController : PortalControllerBase
             .AsNoTracking()
             .Include(s => s.Section)
             .Include(s => s.User)
-            .Where(s => s.IsActive && s.GradeLevelId == assessment.Subject!.GradeLevelId);
+            .Where(s => s.IsActive
+                && s.User != null
+                && s.User.SchoolId == CurrentSchoolId
+                && s.GradeLevelId == assessment.Subject!.GradeLevelId);
 
         if (assessment.SectionId is int sectionId)
         {
@@ -648,13 +690,23 @@ public class MarksController : PortalControllerBase
 
         if (assessment.TeacherId is int assessmentTeacherId)
         {
-            return assessmentTeacherId;
+            return await _db.Teachers
+                .AsNoTracking()
+                .Where(teacher => teacher.Id == assessmentTeacherId
+                    && teacher.User != null
+                    && teacher.User.SchoolId == CurrentSchoolId)
+                .Select(teacher => (int?)teacher.Id)
+                .FirstOrDefaultAsync(cancellationToken);
         }
 
         return await _db.TeacherSubjects
             .AsNoTracking()
-            .Where(ts => ts.SubjectId == assessment.SubjectId && ts.IsActive &&
-                         (assessment.SectionId == null || ts.SectionId == assessment.SectionId))
+            .Where(ts => ts.SubjectId == assessment.SubjectId
+                         && ts.IsActive
+                         && ts.Teacher != null
+                         && ts.Teacher.User != null
+                         && ts.Teacher.User.SchoolId == CurrentSchoolId
+                         && (assessment.SectionId == null || ts.SectionId == assessment.SectionId))
             .Select(ts => (int?)ts.TeacherId)
             .FirstOrDefaultAsync(cancellationToken);
     }
@@ -680,7 +732,10 @@ public class MarksController : PortalControllerBase
 
         var userIds = await _db.Students
             .AsNoTracking()
-            .Where(student => ids.Contains(student.Id) && student.UserId != null)
+            .Where(student => ids.Contains(student.Id)
+                && student.UserId != null
+                && student.User != null
+                && student.User.SchoolId == CurrentSchoolId)
             .Select(student => student.UserId!)
             .Distinct()
             .ToListAsync(cancellationToken);
@@ -711,7 +766,9 @@ public class MarksController : PortalControllerBase
     {
         var query = _db.Marks
             .AsNoTracking()
-            .Where(m => m.StudentId == studentId && m.IsPublished);
+            .Where(m => m.StudentId == studentId
+                && m.SchoolId == CurrentSchoolId
+                && m.IsPublished);
 
         if (subjectId is int subject)
         {
@@ -744,7 +801,8 @@ public class MarksController : PortalControllerBase
         });
 
     private async Task<MarkResponse?> BuildMarkResponseAsync(int markId, CancellationToken cancellationToken) =>
-        await ProjectMarks(_db.Marks.AsNoTracking().Where(m => m.Id == markId))
+        await ProjectMarks(_db.Marks.AsNoTracking()
+                .Where(m => m.Id == markId && m.SchoolId == CurrentSchoolId))
             .FirstOrDefaultAsync(cancellationToken);
 
 }

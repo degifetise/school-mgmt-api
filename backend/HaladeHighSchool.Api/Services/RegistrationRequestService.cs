@@ -49,12 +49,14 @@ public interface IRegistrationRequestService
     /// <summary>Records an application. Creates no login and no student record.</summary>
     Task<RegistrationResult<StudentRegistrationRequest>> SubmitAsync(
         RegisterStudentRequest request,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        Guid? schoolId = null);
 
     /// <summary>Applications in one review state, oldest first.</summary>
     Task<IReadOnlyList<RegistrationRequestResponse>> ListAsync(
         string status,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        Guid? schoolId = null);
 
     /// <summary>
     /// Issues credentials and provisions the account. The returned temporary password exists
@@ -65,14 +67,16 @@ public interface IRegistrationRequestService
         string? note,
         string reviewerUserId,
         CancellationToken cancellationToken = default,
-        bool studentOnly = false);
+        bool studentOnly = false,
+        Guid? schoolId = null);
 
     /// <summary>Turns an application down. Nothing is provisioned.</summary>
     Task<RegistrationResult<RegistrationRequestResponse>> RejectAsync(
         int requestId,
         string? note,
         string reviewerUserId,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        Guid? schoolId = null);
 }
 
 public class RegistrationRequestService : IRegistrationRequestService
@@ -102,8 +106,20 @@ public class RegistrationRequestService : IRegistrationRequestService
 
     public async Task<RegistrationResult<StudentRegistrationRequest>> SubmitAsync(
         RegisterStudentRequest request,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Guid? schoolId = null)
     {
+        var targetSchoolId = schoolId ?? School.DefaultSchoolId;
+        var targetSchool = await _db.Schools
+            .SingleOrDefaultAsync(school => school.Id == targetSchoolId && school.IsActive, cancellationToken);
+        if (targetSchool is null)
+        {
+            return RegistrationResult<StudentRegistrationRequest>.Fail(
+                RegistrationFailure.NotFound,
+                "School unavailable",
+                "This school is not currently accepting registration requests.");
+        }
+
         var contactEmail = request.Email.Trim();
         var requestedRole = request.RequestedRole;
         GradeLevel? gradeLevel = null;
@@ -143,8 +159,10 @@ public class RegistrationRequestService : IRegistrationRequestService
                     "That section does not exist or is not taking students.");
             }
 
-            if (!await _db.GradeLevelSections.AnyAsync(
-                    link => link.GradeLevelId == gradeLevelId && link.SectionId == sectionId,
+            if (!await _db.SchoolGradeSections.AnyAsync(
+                    link => link.SchoolId == targetSchoolId
+                         && link.GradeLevelId == gradeLevelId
+                         && link.SectionId == sectionId,
                     cancellationToken))
             {
                 return RegistrationResult<StudentRegistrationRequest>.Fail(
@@ -156,7 +174,9 @@ public class RegistrationRequestService : IRegistrationRequestService
 
         // A second application while one is outstanding is a duplicate, not a new applicant.
         var alreadyPending = await _db.StudentRegistrationRequests.AnyAsync(
-            r => r.ContactEmail == contactEmail && r.Status == RegistrationRequestStatus.Pending,
+            r => r.SchoolId == targetSchoolId
+              && r.ContactEmail == contactEmail
+              && r.Status == RegistrationRequestStatus.Pending,
             cancellationToken);
 
         if (alreadyPending)
@@ -185,6 +205,8 @@ public class RegistrationRequestService : IRegistrationRequestService
 
         var entity = new StudentRegistrationRequest
         {
+            SchoolId = targetSchoolId,
+            School = targetSchool,
             FullName = request.FullName.Trim(),
             ContactEmail = contactEmail,
             PhotoUrl = photoUrl,
@@ -196,7 +218,9 @@ public class RegistrationRequestService : IRegistrationRequestService
         };
 
         var admins = requestedRole == Roles.Student
-            ? (await _userManager.GetUsersInRoleAsync(Roles.Admin)).ToList()
+            ? (await _userManager.GetUsersInRoleAsync(Roles.Admin))
+                .Where(admin => admin.SchoolId == targetSchoolId)
+                .ToList()
             : [];
 
         _db.StudentRegistrationRequests.Add(entity);
@@ -249,15 +273,17 @@ public class RegistrationRequestService : IRegistrationRequestService
 
     public async Task<IReadOnlyList<RegistrationRequestResponse>> ListAsync(
         string status,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Guid? schoolId = null)
     {
         var rows = await _db.StudentRegistrationRequests
             .AsNoTracking()
-            .Where(r => r.Status == status)
+            .Where(r => r.Status == status && (schoolId == null || r.SchoolId == schoolId))
             .OrderBy(r => r.SubmittedAt)
             .Select(r => new
             {
                 r.Id,
+                r.SchoolId,
                 r.FullName,
                 r.ContactEmail,
                 r.RequestedRole,
@@ -276,7 +302,11 @@ public class RegistrationRequestService : IRegistrationRequestService
                 StudentIdNumber = r.CreatedStudent != null ? r.CreatedStudent.StudentIdNumber : null,
                 // Enrolled students only: what the reviewer needs is the seats actually taken.
                 Occupancy = _db.Students.Count(s =>
-                    s.SectionId == r.SectionId && s.GradeLevelId == r.GradeLevelId && s.IsActive),
+                    s.SectionId == r.SectionId
+                    && s.GradeLevelId == r.GradeLevelId
+                    && s.User != null
+                    && s.User.SchoolId == r.SchoolId
+                    && s.IsActive),
             })
             .ToListAsync(cancellationToken);
 
@@ -322,11 +352,12 @@ public class RegistrationRequestService : IRegistrationRequestService
         string? note,
         string reviewerUserId,
         CancellationToken cancellationToken = default,
-        bool studentOnly = false)
+        bool studentOnly = false,
+        Guid? schoolId = null)
     {
         return await WithRequestLockAsync(
             requestId,
-            token => ApproveUnderLockAsync(requestId, note, reviewerUserId, token, studentOnly),
+            token => ApproveUnderLockAsync(requestId, note, reviewerUserId, token, studentOnly, schoolId),
             cancellationToken);
     }
 
@@ -335,12 +366,15 @@ public class RegistrationRequestService : IRegistrationRequestService
         string? note,
         string reviewerUserId,
         CancellationToken cancellationToken,
-        bool studentOnly)
+        bool studentOnly,
+        Guid? schoolId)
     {
         var request = await _db.StudentRegistrationRequests
             .Include(r => r.GradeLevel)
             .Include(r => r.Section)
-            .FirstOrDefaultAsync(r => r.Id == requestId, cancellationToken);
+            .FirstOrDefaultAsync(
+                r => r.Id == requestId && (schoolId == null || r.SchoolId == schoolId),
+                cancellationToken);
 
         if (request is null)
         {
@@ -376,8 +410,10 @@ public class RegistrationRequestService : IRegistrationRequestService
                 "A student application must include a grade and section.");
         }
 
-        if (!isTeacher && !await _db.GradeLevelSections.AnyAsync(
-                link => link.GradeLevelId == request.GradeLevelId && link.SectionId == request.SectionId,
+        if (!isTeacher && !await _db.SchoolGradeSections.AnyAsync(
+                link => link.SchoolId == request.SchoolId
+                     && link.GradeLevelId == request.GradeLevelId
+                     && link.SectionId == request.SectionId,
                 cancellationToken))
         {
             return RegistrationResult<ApprovedRegistrationResponse>.Fail(
@@ -391,7 +427,11 @@ public class RegistrationRequestService : IRegistrationRequestService
         var occupancy = isTeacher
             ? 0
             : await _db.Students.CountAsync(
-                s => s.SectionId == request.SectionId && s.GradeLevelId == request.GradeLevelId && s.IsActive,
+                s => s.User != null
+                  && s.User.SchoolId == request.SchoolId
+                  && s.SectionId == request.SectionId
+                  && s.GradeLevelId == request.GradeLevelId
+                  && s.IsActive,
                 cancellationToken);
 
         if (!isTeacher && occupancy >= request.Section!.Capacity)
@@ -409,6 +449,7 @@ public class RegistrationRequestService : IRegistrationRequestService
             : await _provisioning.CreateStudentAsync(
                 new ProvisionStudentRequest
                 {
+                    SchoolId = request.SchoolId,
                     FullName = request.FullName,
                     Email = null,
                     GradeLevelId = request.GradeLevelId!.Value,
@@ -430,6 +471,7 @@ public class RegistrationRequestService : IRegistrationRequestService
             ? await _provisioning.CreateTeacherAsync(
                 new ProvisionTeacherRequest
                 {
+                    SchoolId = request.SchoolId,
                     FullName = request.FullName,
                     Email = request.ContactEmail,
                     PhotoUrl = request.PhotoUrl,
@@ -537,11 +579,12 @@ public class RegistrationRequestService : IRegistrationRequestService
         int requestId,
         string? note,
         string reviewerUserId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Guid? schoolId = null)
     {
         return await WithRequestLockAsync(
             requestId,
-            token => RejectUnderLockAsync(requestId, note, reviewerUserId, token),
+            token => RejectUnderLockAsync(requestId, note, reviewerUserId, token, schoolId),
             cancellationToken);
     }
 
@@ -549,10 +592,13 @@ public class RegistrationRequestService : IRegistrationRequestService
         int requestId,
         string? note,
         string reviewerUserId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Guid? schoolId)
     {
         var request = await _db.StudentRegistrationRequests
-            .FirstOrDefaultAsync(r => r.Id == requestId, cancellationToken);
+            .FirstOrDefaultAsync(
+                r => r.Id == requestId && (schoolId == null || r.SchoolId == schoolId),
+                cancellationToken);
 
         if (request is null)
         {
@@ -585,7 +631,7 @@ public class RegistrationRequestService : IRegistrationRequestService
             request.Id,
             reviewerUserId);
 
-        var rejected = await ListAsync(RegistrationRequestStatus.Rejected, cancellationToken);
+        var rejected = await ListAsync(RegistrationRequestStatus.Rejected, cancellationToken, schoolId);
 
         return RegistrationResult<RegistrationRequestResponse>.Ok(
             rejected.First(r => r.Id == request.Id));

@@ -87,11 +87,15 @@ public class AttendanceService : IAttendanceService
         MarkAttendanceRequest request,
         int? teacherId,
         bool isAdmin,
+        Guid schoolId,
         CancellationToken cancellationToken = default)
     {
         var student = await _db.Students
             .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Id == request.StudentId && s.IsActive, cancellationToken);
+            .FirstOrDefaultAsync(s => s.Id == request.StudentId
+                && s.IsActive
+                && s.User != null
+                && s.User.SchoolId == schoolId, cancellationToken);
 
         if (student is null)
         {
@@ -107,7 +111,11 @@ public class AttendanceService : IAttendanceService
 
         var attendance = await _db.Attendance
             .FirstOrDefaultAsync(
-                a => a.StudentId == request.StudentId && a.AttendanceDate == request.AttendanceDate,
+                a => a.StudentId == request.StudentId
+                    && a.AttendanceDate == request.AttendanceDate
+                    && a.Student != null
+                    && a.Student.User != null
+                    && a.Student.User.SchoolId == schoolId,
                 cancellationToken);
 
         if (attendance is null)
@@ -142,6 +150,7 @@ public class AttendanceService : IAttendanceService
         BulkMarkAttendanceRequest request,
         int? teacherId,
         bool isAdmin,
+        Guid schoolId,
         CancellationToken cancellationToken = default)
     {
         var duplicateIds = request.Entries
@@ -157,7 +166,10 @@ public class AttendanceService : IAttendanceService
         }
 
         var students = await _db.Students
-            .Where(s => s.IsActive && s.SectionId == request.SectionId)
+            .Where(s => s.IsActive
+                && s.SectionId == request.SectionId
+                && s.User != null
+                && s.User.SchoolId == schoolId)
             .ToDictionaryAsync(s => s.Id, cancellationToken);
 
         var missingIds = request.Entries.Select(e => e.StudentId).Except(students.Keys).ToList();
@@ -176,7 +188,11 @@ public class AttendanceService : IAttendanceService
 
         var studentIds = request.Entries.Select(e => e.StudentId).ToList();
         var existing = await _db.Attendance
-            .Where(a => studentIds.Contains(a.StudentId) && a.AttendanceDate == request.AttendanceDate)
+            .Where(a => studentIds.Contains(a.StudentId)
+                && a.AttendanceDate == request.AttendanceDate
+                && a.Student != null
+                && a.Student.User != null
+                && a.Student.User.SchoolId == schoolId)
             .ToDictionaryAsync(a => a.StudentId, cancellationToken);
 
         foreach (var entry in request.Entries)
@@ -202,12 +218,14 @@ public class AttendanceService : IAttendanceService
         }
 
         await _db.SaveChangesAsync(cancellationToken);
-        return AttendanceOperationResult.Ok(await ListAsync(
+        var sectionAttendance = await ListAsync(
             null,
             request.SectionId,
             request.AttendanceDate,
             request.AttendanceDate,
-            cancellationToken));
+            cancellationToken);
+        return AttendanceOperationResult.Ok(
+            sectionAttendance.Where(item => students.ContainsKey(item.StudentId)).ToList());
     }
 
     private static IQueryable<AttendanceResponse> Project(IQueryable<Attendance> query) => query

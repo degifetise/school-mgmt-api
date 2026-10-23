@@ -18,7 +18,7 @@ public sealed class AnalyticsController(IAnalyticsService analytics) : PortalCon
     public async Task<ActionResult<AdminAnalyticsOverviewResponse>> GetAdminOverview(
         CancellationToken cancellationToken)
     {
-        var overview = await analytics.GetAdminOverviewAsync(cancellationToken);
+        var overview = await analytics.GetAdminOverviewAsync(CurrentSchoolId, cancellationToken);
         return Ok(overview);
     }
 
@@ -31,6 +31,7 @@ public sealed class AnalyticsController(IAnalyticsService analytics) : PortalCon
     {
         var performance = await analytics.GetTeacherPerformanceAsync(
             User.GetTeacherId(),
+            CurrentSchoolId,
             cancellationToken);
 
         return Ok(performance);

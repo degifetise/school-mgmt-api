@@ -9,6 +9,8 @@ public sealed class School
 
     public string Name { get; set; } = string.Empty;
 
+    public string Slug { get; set; } = string.Empty;
+
     public string Code { get; set; } = string.Empty;
 
     public string ContactEmail { get; set; } = string.Empty;
@@ -17,6 +19,16 @@ public sealed class School
 
     public string Address { get; set; } = string.Empty;
 
+    public string HeroSubtitle { get; set; } = "Nursery through Grade 12, one portal.";
+
+    public string HeroDescription { get; set; } =
+        "Lessons, weighted assessments and report cards in one place.";
+
+    public string PrimaryColor { get; set; } = "#1e3a8a";
+
+    public string AcademicYear { get; set; } =
+        $"{DateTime.UtcNow.Year}-{DateTime.UtcNow.Year + 1}";
+
     public string[] SupportedGrades { get; set; } =
     [
         "Nursery", "KG 1", "KG 2", "KG 3",
@@ -24,6 +36,8 @@ public sealed class School
     ];
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public bool IsActive { get; set; } = true;
 
     public ICollection<ApplicationUser> Users { get; set; } = new List<ApplicationUser>();
 

@@ -11,12 +11,18 @@ public class EventService : IEventService
     private readonly IApplicationDbContext _db;
     private readonly IMapper _mapper;
     private readonly ILogger<EventService> _logger;
+    private readonly IEventImageStorage _imageStorage;
 
-    public EventService(IApplicationDbContext db, IMapper mapper, ILogger<EventService> logger)
+    public EventService(
+        IApplicationDbContext db,
+        IMapper mapper,
+        ILogger<EventService> logger,
+        IEventImageStorage imageStorage)
     {
         _db = db;
         _mapper = mapper;
         _logger = logger;
+        _imageStorage = imageStorage;
     }
 
     public async Task<PaginatedResult<EventDto>> GetEventsAsync(
@@ -29,7 +35,8 @@ public class EventService : IEventService
         string? targetStakeholders = null,
         int? gradeLevelId = null,
         int? sectionId = null,
-        bool includeAllTargets = false)
+        bool includeAllTargets = false,
+        Guid? schoolId = null)
     {
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 100);
@@ -37,6 +44,10 @@ public class EventService : IEventService
         var query = _db.Events.AsNoTracking().Include(e => e.Registrations)
             .Where(e => !e.IsDeleted)
             .AsQueryable();
+        if (schoolId.HasValue)
+        {
+            query = query.Where(e => e.SchoolId == schoolId.Value);
+        }
 
         if (!includeAllTargets)
         {
@@ -107,14 +118,23 @@ public class EventService : IEventService
         };
     }
 
-    public async Task<EventDto?> GetEventAsync(int id, CancellationToken cancellationToken = default)
+    public async Task<EventDto?> GetEventAsync(
+        int id,
+        Guid? schoolId = null,
+        CancellationToken cancellationToken = default)
     {
         var entity = await _db.Events.AsNoTracking().Include(e => e.Registrations)
-            .FirstOrDefaultAsync(e => e.Id == id && !e.IsDeleted, cancellationToken);
+            .FirstOrDefaultAsync(e => e.Id == id
+                && !e.IsDeleted
+                && (!schoolId.HasValue || e.SchoolId == schoolId.Value), cancellationToken);
         return entity is null ? null : _mapper.Map<EventDto>(entity);
     }
 
-    public async Task<EventDto> CreateEventAsync(CreateEventDto request, string? organizerUserId, CancellationToken cancellationToken = default)
+    public async Task<EventDto> CreateEventAsync(
+        CreateEventDto request,
+        string? organizerUserId,
+        Guid schoolId,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(organizerUserId))
         {
@@ -123,17 +143,32 @@ public class EventService : IEventService
 
         var organizerExists = await _db.Users
             .AsNoTracking()
-            .AnyAsync(user => user.Id == organizerUserId, cancellationToken);
+            .AnyAsync(user => user.Id == organizerUserId && user.SchoolId == schoolId, cancellationToken);
         if (!organizerExists)
         {
             throw new EventServiceException("The organizer account does not exist.", StatusCodes.Status401Unauthorized);
         }
 
+        var uploadedImages = await _imageStorage.SaveAsync(request.Images, cancellationToken);
         var entity = _mapper.Map<Event>(request);
+        entity.SchoolId = schoolId;
         entity.OrganizedByUserId = organizerUserId;
+        entity.ImageUrls = uploadedImages.ToArray();
+        entity.BannerImageUrl = uploadedImages.FirstOrDefault() ?? request.BannerUrl;
         entity.IsPublished = true;
         _db.Events.Add(entity);
-        await _db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            foreach (var image in uploadedImages)
+            {
+                _imageStorage.Delete(image);
+            }
+            throw;
+        }
 
         try
         {
@@ -145,7 +180,10 @@ public class EventService : IEventService
             {
                 var studentUserIds = await _db.Students
                     .AsNoTracking()
-                    .Where(student => student.IsActive && student.UserId != null)
+                    .Where(student => student.IsActive
+                        && student.UserId != null
+                        && student.User != null
+                        && student.User.SchoolId == schoolId)
                     .Where(student => gradeIds.Length == 0 || gradeIds.Contains(student.GradeLevelId))
                     .Where(student => sectionIds.Length == 0 || sectionIds.Contains(student.SectionId))
                     .Select(student => student.UserId!)
@@ -158,7 +196,9 @@ public class EventService : IEventService
                 var teacherUserIds = await _db.TeacherSubjects
                     .AsNoTracking()
                     .Where(assignment => assignment.IsActive && assignment.Teacher != null &&
-                        assignment.Teacher.IsActive && assignment.Teacher.UserId != null)
+                        assignment.Teacher.IsActive && assignment.Teacher.UserId != null
+                        && assignment.Teacher.User != null
+                        && assignment.Teacher.User.SchoolId == schoolId)
                     .Where(assignment => gradeIds.Length == 0 ||
                         (assignment.Subject != null && gradeIds.Contains(assignment.Subject.GradeLevelId)))
                     .Where(assignment => sectionIds.Length == 0 || sectionIds.Contains(assignment.SectionId))
@@ -188,25 +228,54 @@ public class EventService : IEventService
         return _mapper.Map<EventDto>(entity);
     }
 
-    public async Task<EventDto?> UpdateEventAsync(int id, UpdateEventDto request, CancellationToken cancellationToken = default)
+    public async Task<EventDto?> UpdateEventAsync(
+        int id,
+        UpdateEventDto request,
+        Guid schoolId,
+        CancellationToken cancellationToken = default)
     {
         var entity = await _db.Events.Include(e => e.Registrations)
-            .FirstOrDefaultAsync(e => e.Id == id && !e.IsDeleted, cancellationToken);
+            .FirstOrDefaultAsync(e => e.Id == id
+                && e.SchoolId == schoolId
+                && !e.IsDeleted, cancellationToken);
         if (entity is null) return null;
+        var uploadedImages = await _imageStorage.SaveAsync(request.Images, cancellationToken);
         _mapper.Map(request, entity);
+        if (uploadedImages.Count > 0)
+        {
+            entity.ImageUrls = entity.ImageUrls.Concat(uploadedImages).Distinct().ToArray();
+            entity.BannerImageUrl = entity.ImageUrls[0];
+        }
         entity.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            foreach (var image in uploadedImages)
+            {
+                _imageStorage.Delete(image);
+            }
+            throw;
+        }
         return _mapper.Map<EventDto>(entity);
     }
 
-    public async Task<EventDto?> UpdateStatusAsync(int id, string status, CancellationToken cancellationToken = default)
+    public async Task<EventDto?> UpdateStatusAsync(
+        int id,
+        string status,
+        Guid schoolId,
+        CancellationToken cancellationToken = default)
     {
         var normalizedStatus = status?.Trim();
         if (!EventStatuses.All.Contains(normalizedStatus, StringComparer.OrdinalIgnoreCase))
             throw new EventServiceException("Status must be Upcoming, Ongoing, Completed or Canceled.", StatusCodes.Status400BadRequest);
 
         var entity = await _db.Events.Include(e => e.Registrations)
-            .FirstOrDefaultAsync(e => e.Id == id && !e.IsDeleted, cancellationToken);
+            .FirstOrDefaultAsync(e => e.Id == id
+                && e.SchoolId == schoolId
+                && !e.IsDeleted, cancellationToken);
         if (entity is null) return null;
 
         normalizedStatus = EventStatuses.All.First(value => string.Equals(value, normalizedStatus, StringComparison.OrdinalIgnoreCase));
@@ -218,23 +287,35 @@ public class EventService : IEventService
         return _mapper.Map<EventDto>(entity);
     }
 
-    public async Task<bool> DeleteEventAsync(int id, CancellationToken cancellationToken = default)
+    public async Task<bool> DeleteEventAsync(
+        int id,
+        Guid schoolId,
+        CancellationToken cancellationToken = default)
     {
-        var entity = await _db.Events.FirstOrDefaultAsync(e => e.Id == id && !e.IsDeleted, cancellationToken);
+        var entity = await _db.Events.FirstOrDefaultAsync(e =>
+            e.Id == id && e.SchoolId == schoolId && !e.IsDeleted, cancellationToken);
         if (entity is null) return false;
         entity.IsCancelled = true;
         entity.IsPublished = false;
         entity.IsDeleted = true;
         entity.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(cancellationToken);
+        foreach (var image in entity.ImageUrls)
+        {
+            _imageStorage.Delete(image);
+        }
         return true;
     }
 
-    public async Task<EventRegistrationDto> RegisterAsync(int eventId, int studentId, CancellationToken cancellationToken = default)
+    public async Task<EventRegistrationDto> RegisterAsync(
+        int eventId,
+        int studentId,
+        Guid schoolId,
+        CancellationToken cancellationToken = default)
     {
         try
         {
-            return await RegisterCoreAsync(eventId, studentId, cancellationToken);
+            return await RegisterCoreAsync(eventId, studentId, schoolId, cancellationToken);
         }
         catch (EventServiceException)
         {
@@ -258,7 +339,11 @@ public class EventService : IEventService
         }
     }
 
-    private async Task<EventRegistrationDto> RegisterCoreAsync(int eventId, int studentId, CancellationToken cancellationToken)
+    private async Task<EventRegistrationDto> RegisterCoreAsync(
+        int eventId,
+        int studentId,
+        Guid schoolId,
+        CancellationToken cancellationToken)
     {
         var strategy = _db.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
@@ -268,10 +353,15 @@ public class EventService : IEventService
                 System.Data.IsolationLevel.Serializable,
                 cancellationToken);
             var eventEntity = await _db.Events.Include(e => e.Registrations)
-                .FirstOrDefaultAsync(e => e.Id == eventId && !e.IsDeleted, cancellationToken)
+                .FirstOrDefaultAsync(e => e.Id == eventId
+                    && e.SchoolId == schoolId
+                    && !e.IsDeleted, cancellationToken)
                 ?? throw new EventServiceException("Event was not found.", StatusCodes.Status404NotFound);
 
-            if (!await _db.Students.AnyAsync(s => s.Id == studentId && s.IsActive, cancellationToken))
+            if (!await _db.Students.AnyAsync(s => s.Id == studentId
+                    && s.IsActive
+                    && s.User != null
+                    && s.User.SchoolId == schoolId, cancellationToken))
                 throw new EventServiceException("Active student was not found.", StatusCodes.Status404NotFound);
 
             var now = DateTime.UtcNow;
@@ -308,9 +398,22 @@ public class EventService : IEventService
         });
     }
 
-    public async Task<bool> CancelRegistrationAsync(int eventId, int studentId, CancellationToken cancellationToken = default)
+    public async Task<bool> CancelRegistrationAsync(
+        int eventId,
+        int studentId,
+        Guid schoolId,
+        CancellationToken cancellationToken = default)
     {
-        var registration = await _db.EventRegistrations.FirstOrDefaultAsync(r => r.EventId == eventId && r.StudentId == studentId && r.Status == EventRegistrationStatuses.Confirmed, cancellationToken);
+        var registration = await _db.EventRegistrations.FirstOrDefaultAsync(r =>
+            r.EventId == eventId
+            && r.Event != null
+            && r.Event.SchoolId == schoolId
+            && r.Student != null
+            && r.Student.User != null
+            && r.Student.User.SchoolId == schoolId
+            && r.StudentId == studentId
+            && r.Status == EventRegistrationStatuses.Confirmed,
+            cancellationToken);
         if (registration is null) return false;
         registration.Status = EventRegistrationStatuses.Cancelled;
         registration.CancelledAt = DateTime.UtcNow;
@@ -318,18 +421,50 @@ public class EventService : IEventService
         return true;
     }
 
-    public async Task<IReadOnlyList<EventRegistrationDto>> GetRegistrationsAsync(int eventId, CancellationToken cancellationToken = default) =>
-        (await _db.EventRegistrations.AsNoTracking().Where(r => r.EventId == eventId).OrderByDescending(r => r.RegisteredAt).ToListAsync(cancellationToken))
+    public async Task<IReadOnlyList<EventRegistrationDto>> GetRegistrationsAsync(
+        int eventId,
+        Guid schoolId,
+        CancellationToken cancellationToken = default) =>
+        (await _db.EventRegistrations.AsNoTracking()
+            .Where(r => r.EventId == eventId
+                && r.Event != null
+                && r.Event.SchoolId == schoolId
+                && r.Student != null
+                && r.Student.User != null
+                && r.Student.User.SchoolId == schoolId)
+            .OrderByDescending(r => r.RegisteredAt)
+            .ToListAsync(cancellationToken))
         .Select(_mapper.Map<EventRegistrationDto>).ToList();
 
-    public async Task<IReadOnlyList<EventDto>> GetUpcomingEventsAsync(int count, CancellationToken cancellationToken = default) =>
-        (await _db.Events.AsNoTracking().Include(e => e.Registrations).Where(e => !e.IsDeleted && e.IsPublished && !e.IsCancelled && e.StartsAt > DateTime.UtcNow).OrderBy(e => e.StartsAt).Take(Math.Clamp(count, 1, 20)).ToListAsync(cancellationToken))
+    public async Task<IReadOnlyList<EventDto>> GetUpcomingEventsAsync(
+        int count,
+        Guid? schoolId = null,
+        CancellationToken cancellationToken = default) =>
+        (await _db.Events.AsNoTracking().Include(e => e.Registrations)
+            .Where(e => !e.IsDeleted && e.IsPublished && !e.IsCancelled && e.StartsAt > DateTime.UtcNow
+                && (!schoolId.HasValue || e.SchoolId == schoolId.Value))
+            .OrderBy(e => e.StartsAt)
+            .Take(Math.Clamp(count, 1, 20))
+            .ToListAsync(cancellationToken))
         .Select(_mapper.Map<EventDto>).ToList();
 
-    public Task<int> GetTotalRegistrationsCountAsync(CancellationToken cancellationToken = default) =>
-        _db.EventRegistrations.CountAsync(r => r.Status == EventRegistrationStatuses.Confirmed, cancellationToken);
+    public Task<int> GetTotalRegistrationsCountAsync(
+        Guid? schoolId = null,
+        CancellationToken cancellationToken = default) =>
+        _db.EventRegistrations.CountAsync(r =>
+            r.Status == EventRegistrationStatuses.Confirmed
+            && (!schoolId.HasValue || r.Event != null && r.Event.SchoolId == schoolId.Value),
+            cancellationToken);
 
-    public async Task<IReadOnlyList<EventDto>> GetPopularEventsAsync(int top, CancellationToken cancellationToken = default) =>
-        (await _db.Events.AsNoTracking().Include(e => e.Registrations).Where(e => !e.IsDeleted && !e.IsCancelled).OrderByDescending(e => e.Registrations.Count(r => r.Status == EventRegistrationStatuses.Confirmed)).Take(Math.Clamp(top, 1, 20)).ToListAsync(cancellationToken))
+    public async Task<IReadOnlyList<EventDto>> GetPopularEventsAsync(
+        int top,
+        Guid? schoolId = null,
+        CancellationToken cancellationToken = default) =>
+        (await _db.Events.AsNoTracking().Include(e => e.Registrations)
+            .Where(e => !e.IsDeleted && !e.IsCancelled
+                && (!schoolId.HasValue || e.SchoolId == schoolId.Value))
+            .OrderByDescending(e => e.Registrations.Count(r => r.Status == EventRegistrationStatuses.Confirmed))
+            .Take(Math.Clamp(top, 1, 20))
+            .ToListAsync(cancellationToken))
         .Select(_mapper.Map<EventDto>).ToList();
 }

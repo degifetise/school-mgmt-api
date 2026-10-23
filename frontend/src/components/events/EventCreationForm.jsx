@@ -4,6 +4,7 @@ import {
   Calendar,
   CheckSquare,
   Clock,
+  ImagePlus,
   MapPin,
   Users,
   X,
@@ -95,6 +96,9 @@ export default function EventCreationForm({ event = null, isOpen = true, onClose
   const [successMessage, setSuccessMessage] = useState('');
   const [grades, setGrades] = useState([]);
   const [sections, setSections] = useState([]);
+  const [selectedImages, setSelectedImages] = useState([]);
+  const [imagePreviews, setImagePreviews] = useState([]);
+  const [imageError, setImageError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -115,9 +119,17 @@ export default function EventCreationForm({ event = null, isOpen = true, onClose
 
   useEffect(() => {
     setForm(formFromEvent(event));
+    setSelectedImages([]);
+    setImageError('');
     setErrors({});
     setSuccessMessage('');
   }, [event]);
+
+  useEffect(() => {
+    const objectUrls = selectedImages.map((file) => URL.createObjectURL(file));
+    setImagePreviews(objectUrls);
+    return () => objectUrls.forEach((url) => URL.revokeObjectURL(url));
+  }, [selectedImages]);
 
   useEffect(() => {
     if (!event || grades.length === 0) return;
@@ -219,6 +231,14 @@ export default function EventCreationForm({ event = null, isOpen = true, onClose
       nextErrors.audience = 'Please choose a target audience.';
     }
 
+    if (selectedImages.length > 5) {
+      nextErrors.images = 'Choose no more than 5 images.';
+    } else if (selectedImages.some((file) => file.size > 5 * 1024 * 1024)) {
+      nextErrors.images = 'Each image must be 5 MB or smaller.';
+    } else if (selectedImages.some((file) => !['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(file.type))) {
+      nextErrors.images = 'Use JPEG, PNG, GIF, or WebP images.';
+    }
+
     return nextErrors;
   };
 
@@ -243,6 +263,7 @@ export default function EventCreationForm({ event = null, isOpen = true, onClose
       targetStakeholders: form.audience,
       targetGradeIds: getGradeIds(form.gradeScope, grades),
       targetSectionIds: form.allSections || form.gradeScope[allGradesKey] ? [] : form.targetSectionIds,
+      images: selectedImages,
     };
 
     try {
@@ -431,6 +452,74 @@ export default function EventCreationForm({ event = null, isOpen = true, onClose
                   {errors.venue ? <p className="mt-2 text-xs text-rose-600">{errors.venue}</p> : null}
                 </div>
               </div>
+            </section>
+
+            <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5">
+              <div className="flex items-center gap-3">
+                <div className="grid size-10 place-items-center rounded-xl bg-amber-100 text-amber-700">
+                  <ImagePlus className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">Event images</h3>
+                  <p className="text-sm text-slate-500">Optional · up to 5 images, 5 MB each</p>
+                </div>
+              </div>
+              <label htmlFor="event-images" className="label">Add images</label>
+              <input
+                id="event-images"
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                multiple
+                onChange={(changeEvent) => {
+                  const files = Array.from(changeEvent.target.files ?? []);
+                  setSelectedImages(files);
+                  setImageError(files.length > 5
+                    ? 'Choose no more than 5 images.'
+                    : files.some((file) => file.size > 5 * 1024 * 1024)
+                      ? 'Each image must be 5 MB or smaller.'
+                      : files.some((file) => !['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(file.type))
+                        ? 'Use JPEG, PNG, GIF, or WebP images.'
+                        : '');
+                }}
+                className="input"
+                aria-describedby="event-images-help"
+              />
+              <p id="event-images-help" className="text-xs text-slate-500">
+                JPEG, PNG, GIF, or WebP. Selecting new files replaces the current pending selection.
+              </p>
+              {imageError && <p role="alert" className="text-sm text-rose-600">{imageError}</p>}
+              {errors.images && <p role="alert" className="text-sm text-rose-600">{errors.images}</p>}
+              {event?.imageUrls?.length > 0 && (
+                <div>
+                  <p className="mb-2 text-sm font-medium text-slate-700">Current event images</p>
+                  <div className="flex flex-wrap gap-3">
+                    {event.imageUrls.map((url) => (
+                      <img key={url} src={url} alt="" className="size-20 rounded-lg object-cover" />
+                    ))}
+                  </div>
+                </div>
+              )}
+              {selectedImages.length > 0 && (
+                <div className="flex flex-wrap gap-3">
+                  {selectedImages.map((file, index) => (
+                    <div key={`${file.name}-${index}`} className="relative">
+                      <img
+                        src={imagePreviews[index]}
+                        alt={`Preview of ${file.name}`}
+                        className="size-20 rounded-lg object-cover"
+                      />
+                      <button
+                        type="button"
+                        className="absolute -top-2 -right-2 rounded-full bg-slate-900 p-1 text-white"
+                        onClick={() => setSelectedImages((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                        aria-label={`Remove ${file.name}`}
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </section>
 
             <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5">

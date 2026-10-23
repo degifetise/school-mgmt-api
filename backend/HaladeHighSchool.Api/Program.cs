@@ -151,14 +151,24 @@ builder.Services
                 var user = await db.Users
                     .AsNoTracking()
                     .Where(user => user.Id == userId)
-                    .Select(user => new { user.IsActive, user.SchoolId })
+                    .Select(user => new
+                    {
+                        user.IsActive,
+                        user.SchoolId,
+                        SchoolIsActive = db.Schools
+                            .Where(school => school.Id == user.SchoolId)
+                            .Select(school => (bool?)school.IsActive)
+                            .FirstOrDefault()
+                    })
                     .FirstOrDefaultAsync(context.HttpContext.RequestAborted);
 
                 var tokenSchoolId = context.Principal?.FindFirstValue(PortalClaims.SchoolId);
+                var isSuperAdmin = context.Principal?.IsInRole(Roles.SuperAdmin) == true;
                 if (user is null
                     || !user.IsActive
                     || !Guid.TryParse(tokenSchoolId, out var schoolId)
-                    || schoolId != user.SchoolId)
+                    || schoolId != user.SchoolId
+                    || (!isSuperAdmin && user.SchoolIsActive != true))
                 {
                     context.Fail("The account is not active or its school assignment has changed.");
                 }
@@ -217,6 +227,7 @@ builder.Services.AddScoped<IEmailSender, SendGridEmailSender>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 builder.Services.AddScoped<IEventService, EventService>();
+builder.Services.AddSingleton<IEventImageStorage, EventImageStorage>();
 builder.Services.AddSingleton<ILessonFileStorage, LessonFileStorage>();
 
 builder.Services.AddFluentValidationAutoValidation();
@@ -313,7 +324,7 @@ app.MapControllers();
 // ---------------------------------------------------------------------------
 try
 {
-    app.Logger.LogInformation("Applying pending database migrations and seeding master data.");
+    app.Logger.LogInformation("Initializing the database when it is reachable.");
     await app.InitializeDatabaseAsync();
     app.Run();
 }

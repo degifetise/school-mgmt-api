@@ -23,9 +23,48 @@ public record SchoolInfoResponse
     public string? ContactEmail { get; init; }
     public string AcademicYear { get; init; } = string.Empty;
     public bool AllowSelfRegistration { get; init; }
+    public string HeroSubtitle { get; init; } = string.Empty;
+    public string HeroDescription { get; init; } = string.Empty;
+    public string PrimaryColor { get; init; } = "#1e3a8a";
 }
 
-/// <summary>The full contents of the SystemSettings table, all of it admin editable.</summary>
+/// <summary>Branding and academic-year settings for the authenticated user's school.</summary>
+public sealed record SchoolBrandingSettingsResponse(
+    string HeroSubtitle,
+    string HeroDescription,
+    string PrimaryColor,
+    string AcademicYear);
+
+/// <summary>Updates branding and academic-year settings for the authenticated user's school.</summary>
+public sealed record UpdateSchoolBrandingSettingsRequest : IValidatableObject
+{
+    [Required, MaxLength(200)]
+    public required string HeroSubtitle { get; init; }
+
+    [Required, MaxLength(2000)]
+    public required string HeroDescription { get; init; }
+
+    [Required, RegularExpression("^#[0-9A-Fa-f]{6}$")]
+    public required string PrimaryColor { get; init; }
+
+    [Required, RegularExpression("^[0-9]{4}-[0-9]{4}$")]
+    public required string AcademicYear { get; init; }
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (AcademicYear is { Length: 9 } academicYear &&
+            int.TryParse(academicYear[..4], out var start) &&
+            int.TryParse(academicYear[5..], out var end) &&
+            end != start + 1)
+        {
+            yield return new ValidationResult(
+                "AcademicYear must span two consecutive years.",
+                [nameof(AcademicYear)]);
+        }
+    }
+}
+
+/// <summary>Global system settings plus the legacy default school name.</summary>
 public record SystemSettingsResponse
 {
     public string SchoolName { get; init; } = string.Empty;
@@ -41,9 +80,6 @@ public record SystemSettingsResponse
 
 public record UpdateSystemSettingsRequest : IValidatableObject
 {
-    [Required, MaxLength(200)]
-    public string SchoolName { get; init; } = string.Empty;
-
     /// <summary>
     /// Optional. Send null or an empty string to clear it. The address is checked in
     /// <see cref="Validate"/> rather than with [EmailAddress], because that attribute treats

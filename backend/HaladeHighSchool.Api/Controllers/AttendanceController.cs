@@ -175,6 +175,7 @@ public class AttendanceController : PortalControllerBase
                 request,
                 teacherId,
                 User.IsAdmin(),
+                CurrentSchoolId,
                 cancellationToken);
 
             return result.Succeeded
@@ -210,6 +211,7 @@ public class AttendanceController : PortalControllerBase
                 request,
                 teacherId,
                 User.IsAdmin(),
+                CurrentSchoolId,
                 cancellationToken);
 
             return result.Succeeded
@@ -233,7 +235,8 @@ public class AttendanceController : PortalControllerBase
         var userId = User.GetUserId();
         return await _db.Teachers
             .AsNoTracking()
-            .Where(t => t.UserId == userId && t.IsActive)
+            .Where(t => t.UserId == userId && t.IsActive
+                && t.User != null && t.User.SchoolId == CurrentSchoolId)
             .Select(t => (int?)t.Id)
             .FirstOrDefaultAsync(cancellationToken);
     }

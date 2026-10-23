@@ -33,14 +33,18 @@ public sealed class BulkTeacherAssignmentsController : PortalControllerBase
         BulkTeacherAssignmentRequest request,
         CancellationToken cancellationToken)
     {
-        var teacherExists = await _db.Teachers.AnyAsync(teacher => teacher.Id == request.TeacherId, cancellationToken);
+        var teacherExists = await _db.Teachers.AnyAsync(
+            teacher => teacher.Id == request.TeacherId
+                && teacher.User != null
+                && teacher.User.SchoolId == CurrentSchoolId,
+            cancellationToken);
         if (!teacherExists) return NotFoundProblem($"Teacher {request.TeacherId} was not found.");
 
         var subjectIds = request.SubjectIds.Distinct().ToArray();
         var sectionIds = request.SectionIds.Distinct().ToArray();
         var activeSubjects = await _db.Subjects
             .Where(subject => subjectIds.Contains(subject.Id) && subject.IsActive)
-            .Select(subject => subject.Id)
+            .Select(subject => new { subject.Id, subject.GradeLevelId })
             .ToListAsync(cancellationToken);
         var activeSections = await _db.Sections
             .Where(section => sectionIds.Contains(section.Id) && section.IsActive)
@@ -49,9 +53,31 @@ public sealed class BulkTeacherAssignmentsController : PortalControllerBase
         if (activeSubjects.Count != subjectIds.Length || activeSections.Count != sectionIds.Length)
             return BadRequestProblem("Invalid assignments", "Every selected subject and section must exist and be active.");
 
+        var gradeLevelIds = activeSubjects.Select(subject => subject.GradeLevelId).Distinct().ToArray();
+        var configuredPairs = await _db.SchoolGradeSections
+            .Where(link => link.SchoolId == CurrentSchoolId
+                && gradeLevelIds.Contains(link.GradeLevelId)
+                && sectionIds.Contains(link.SectionId)
+                && link.GradeLevel!.IsActive
+                && link.Section!.IsActive)
+            .Select(link => new { link.GradeLevelId, link.SectionId })
+            .ToListAsync(cancellationToken);
+        var configuredPairSet = configuredPairs
+            .Select(pair => (pair.GradeLevelId, pair.SectionId))
+            .ToHashSet();
+        if (activeSubjects.Any(subject => sectionIds.Any(sectionId =>
+                !configuredPairSet.Contains((subject.GradeLevelId, sectionId)))))
+        {
+            return BadRequestProblem(
+                "Invalid assignments",
+                "Every subject and section pair must be configured for this school.");
+        }
+
         var academicYear = await _settings.GetAcademicYearAsync(cancellationToken);
         var existing = await _db.TeacherSubjects
             .Where(assignment => assignment.TeacherId == request.TeacherId
+                && assignment.Teacher!.User != null
+                && assignment.Teacher.User.SchoolId == CurrentSchoolId
                 && assignment.AcademicYear == academicYear
                 && subjectIds.Contains(assignment.SubjectId)
                 && sectionIds.Contains(assignment.SectionId))

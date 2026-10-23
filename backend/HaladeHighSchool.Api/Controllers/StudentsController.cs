@@ -60,7 +60,7 @@ public class StudentsController : PortalControllerBase
         page = Math.Max(page, 1);
         pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
 
-        var query = _db.Students.AsNoTracking();
+        var query = SchoolStudents(_db.Students.AsNoTracking());
 
         if (!includeInactive)
         {
@@ -129,7 +129,7 @@ public class StudentsController : PortalControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<StudentDetailResponse>> GetStudent(int id, CancellationToken cancellationToken)
     {
-        var student = await ProjectDetail(_db.Students.AsNoTracking().Where(s => s.Id == id))
+        var student = await ProjectDetail(SchoolStudents(_db.Students.AsNoTracking()).Where(s => s.Id == id))
             .FirstOrDefaultAsync(cancellationToken);
 
         return student is null ? NotFoundProblem($"Student {id} was not found.") : Ok(student);
@@ -214,7 +214,7 @@ public class StudentsController : PortalControllerBase
             });
         }
 
-        var detail = await ProjectDetail(_db.Students.AsNoTracking().Where(s => s.Id == result.Entity.Id))
+        var detail = await ProjectDetail(SchoolStudents(_db.Students.AsNoTracking()).Where(s => s.Id == result.Entity.Id))
             .FirstAsync(cancellationToken);
 
         _logger.LogInformation(
@@ -237,7 +237,7 @@ public class StudentsController : PortalControllerBase
         UpdateStudentRequest request,
         CancellationToken cancellationToken)
     {
-        var student = await _db.Students
+        var student = await SchoolStudents(_db.Students)
             .Include(s => s.User)
             .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
 
@@ -261,7 +261,7 @@ public class StudentsController : PortalControllerBase
 
         await _db.SaveChangesAsync(cancellationToken);
 
-        var detail = await ProjectDetail(_db.Students.AsNoTracking().Where(s => s.Id == id))
+        var detail = await ProjectDetail(SchoolStudents(_db.Students.AsNoTracking()).Where(s => s.Id == id))
             .FirstAsync(cancellationToken);
 
         return Ok(detail);
@@ -277,7 +277,7 @@ public class StudentsController : PortalControllerBase
         AssignClassRequest request,
         CancellationToken cancellationToken)
     {
-        var student = await _db.Students.FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
+        var student = await SchoolStudents(_db.Students).FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
 
         if (student is null)
         {
@@ -316,7 +316,7 @@ public class StudentsController : PortalControllerBase
 
         if (isMoving)
         {
-            var occupancy = await _db.Students.CountAsync(
+            var occupancy = await SchoolStudents(_db.Students).CountAsync(
                 s => s.GradeLevelId == request.GradeLevelId
                      && s.SectionId == request.SectionId
                      && s.IsActive
@@ -340,7 +340,7 @@ public class StudentsController : PortalControllerBase
             "Student {StudentIdNumber} assigned to {Grade} {Section}",
             student.StudentIdNumber, gradeLevel.Name, section.Name);
 
-        var detail = await ProjectDetail(_db.Students.AsNoTracking().Where(s => s.Id == id))
+        var detail = await ProjectDetail(SchoolStudents(_db.Students.AsNoTracking()).Where(s => s.Id == id))
             .FirstAsync(cancellationToken);
 
         return Ok(detail);
@@ -358,7 +358,7 @@ public class StudentsController : PortalControllerBase
         SetActiveRequest request,
         CancellationToken cancellationToken)
     {
-        var student = await _db.Students
+        var student = await SchoolStudents(_db.Students)
             .Include(s => s.User)
             .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
 
@@ -376,7 +376,7 @@ public class StudentsController : PortalControllerBase
 
         await _db.SaveChangesAsync(cancellationToken);
 
-        var detail = await ProjectDetail(_db.Students.AsNoTracking().Where(s => s.Id == id))
+        var detail = await ProjectDetail(SchoolStudents(_db.Students.AsNoTracking()).Where(s => s.Id == id))
             .FirstAsync(cancellationToken);
 
         return Ok(detail);
@@ -391,7 +391,7 @@ public class StudentsController : PortalControllerBase
         int id,
         CancellationToken cancellationToken)
     {
-        var student = await _db.Students
+        var student = await SchoolStudents(_db.Students)
             .AsNoTracking()
             .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
 
@@ -445,7 +445,7 @@ public class StudentsController : PortalControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteStudent(int id, CancellationToken cancellationToken)
     {
-        var student = await _db.Students.FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
+        var student = await SchoolStudents(_db.Students).FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
 
         if (student is null)
         {
@@ -486,7 +486,7 @@ public class StudentsController : PortalControllerBase
     [ProducesResponseType<IEnumerable<object>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetSummary(CancellationToken cancellationToken)
     {
-        var summary = await _db.Students
+        var summary = await SchoolStudents(_db.Students)
             .AsNoTracking()
             .Where(s => s.IsActive)
             .GroupBy(s => new { s.GradeLevelId, GradeLevelName = s.GradeLevel!.Name, s.SectionId, SectionName = s.Section!.Name })
@@ -506,8 +506,8 @@ public class StudentsController : PortalControllerBase
     }
 
     /// <summary>
-    /// Advances every active student to the next grade level for the new academic year, then
-    /// updates the stored academic-year setting only after the admin explicitly confirms it.
+    /// Advances active students in the current school. The system-wide academic-year setting
+    /// is managed separately by SuperAdmin through SystemSettingsController.
     /// </summary>
     [HttpPost("academic-year-rollover")]
     [ProducesResponseType<AcademicYearRolloverResponse>(StatusCodes.Status200OK)]
@@ -538,7 +538,7 @@ public class StudentsController : PortalControllerBase
             return BadRequestProblem("Invalid academic year", "AcademicYear must look like '2026-2027'.");
         }
 
-        var students = await _db.Students
+        var students = await SchoolStudents(_db.Students)
             .Include(s => s.GradeLevel)
             .Where(s => s.IsActive)
             .OrderBy(s => s.Id)
@@ -582,27 +582,6 @@ public class StudentsController : PortalControllerBase
             await _db.SaveChangesAsync(cancellationToken);
         }
 
-        var academicYearRow = await _db.SystemSettings
-            .FirstOrDefaultAsync(s => s.Key == "AcademicYear", cancellationToken);
-
-        if (academicYearRow is null)
-        {
-            _db.SystemSettings.Add(new HaladeHighSchool.Api.Models.SystemSetting
-            {
-                Key = "AcademicYear",
-                Value = request.NewAcademicYear,
-                Description = "Active academic year",
-                UpdatedAt = DateTime.UtcNow
-            });
-        }
-        else
-        {
-            academicYearRow.Value = request.NewAcademicYear;
-            academicYearRow.UpdatedAt = DateTime.UtcNow;
-        }
-
-        await _db.SaveChangesAsync(cancellationToken);
-
         var response = new AcademicYearRolloverResponse
         {
             FromAcademicYear = currentAcademicYear,
@@ -611,7 +590,7 @@ public class StudentsController : PortalControllerBase
             StudentsSeen = students.Count,
             PromotedCount = promotedCount,
             SkippedCount = skippedCount,
-            UpdatedAcademicYear = 1
+            UpdatedAcademicYear = 0
         };
 
         _logger.LogInformation(
@@ -627,8 +606,11 @@ public class StudentsController : PortalControllerBase
 
     /// <summary>Re-reads one student through the shared detail projection.</summary>
     private Task<StudentDetailResponse?> BuildDetailAsync(int id, CancellationToken cancellationToken) =>
-        ProjectDetail(_db.Students.AsNoTracking().Where(s => s.Id == id))
+        ProjectDetail(SchoolStudents(_db.Students.AsNoTracking()).Where(s => s.Id == id))
             .FirstOrDefaultAsync(cancellationToken)!;
+
+    private IQueryable<Student> SchoolStudents(IQueryable<Student> query) =>
+        query.Where(student => student.User != null && student.User.SchoolId == CurrentSchoolId);
 
     private static IQueryable<StudentDetailResponse> ProjectDetail(IQueryable<Student> query) =>
         query.Select(s => new StudentDetailResponse

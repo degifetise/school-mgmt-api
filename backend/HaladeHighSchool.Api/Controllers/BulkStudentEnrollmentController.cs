@@ -25,12 +25,22 @@ public sealed class BulkStudentEnrollmentController : PortalControllerBase
         BulkStudentEnrollmentRequest request,
         CancellationToken cancellationToken)
     {
-        var gradeExists = await _db.GradeLevels.AnyAsync(
-            grade => grade.Id == request.GradeLevelId && grade.IsActive, cancellationToken);
+        var gradeExists = await _db.SchoolGradeSections.AnyAsync(
+            link => link.SchoolId == CurrentSchoolId
+                && link.GradeLevelId == request.GradeLevelId
+                && link.GradeLevel!.IsActive,
+            cancellationToken);
         var section = await _db.Sections
             .AsNoTracking()
             .FirstOrDefaultAsync(item => item.Id == request.SectionId && item.IsActive, cancellationToken);
-        if (!gradeExists || section is null)
+        var destinationConfigured = await _db.SchoolGradeSections.AnyAsync(
+            link => link.SchoolId == CurrentSchoolId
+                && link.GradeLevelId == request.GradeLevelId
+                && link.SectionId == request.SectionId
+                && link.GradeLevel!.IsActive
+                && link.Section!.IsActive,
+            cancellationToken);
+        if (!gradeExists || section is null || !destinationConfigured)
             return BadRequestProblem("Invalid destination", "Choose an active grade and section.");
 
         var requestedNumbers = request.StudentIdNumbers
@@ -42,7 +52,10 @@ public sealed class BulkStudentEnrollmentController : PortalControllerBase
             return BadRequestProblem("No students selected", "Enter at least one student ID number.");
 
         var students = await _db.Students
-            .Where(student => requestedNumbers.Contains(student.StudentIdNumber) && student.IsActive)
+            .Where(student => requestedNumbers.Contains(student.StudentIdNumber)
+                && student.IsActive
+                && student.User != null
+                && student.User.SchoolId == CurrentSchoolId)
             .ToListAsync(cancellationToken);
         if (students.Count != requestedNumbers.Length)
         {
@@ -54,7 +67,9 @@ public sealed class BulkStudentEnrollmentController : PortalControllerBase
         var currentOccupancy = await _db.Students.CountAsync(
             student => student.IsActive
                 && student.GradeLevelId == request.GradeLevelId
-                && student.SectionId == request.SectionId,
+                && student.SectionId == request.SectionId
+                && student.User != null
+                && student.User.SchoolId == CurrentSchoolId,
             cancellationToken);
         var studentsAlreadyInDestination = students.Count(student =>
             student.GradeLevelId == request.GradeLevelId && student.SectionId == request.SectionId);

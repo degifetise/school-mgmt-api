@@ -15,6 +15,7 @@ import {
 import { publicApi } from '../services/endpoints';
 import { useApiResource } from '../hooks/useApiResource';
 import { homeRouteFor, useAuth } from '../context/AuthContext';
+import { useSchoolInfo } from '../context/SchoolInfoContext';
 import { ErrorState, Skeleton, SkeletonCard } from '../components/ui/Feedback';
 
 function StatTile({ icon: Icon, label, value, hint }) {
@@ -36,6 +37,7 @@ function StatTile({ icon: Icon, label, value, hint }) {
 
 export default function HomePage() {
   const { isAuthenticated, roles, user } = useAuth();
+  const schoolData = useSchoolInfo();
 
   const fetchOverview = useCallback(() => publicApi.overview(), []);
   const fetchEvents = useCallback(() => publicApi.events(3), []);
@@ -49,14 +51,19 @@ export default function HomePage() {
   return (
     <div>
       {/* Hero */}
-      <section className="bg-brand-800 text-white">
+      <section
+        className="text-white"
+        style={{ backgroundColor: schoolData.primaryColor || '#1e3a8a' }}
+      >
         <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
             {overview.loading ? (
               <Skeleton className="h-4 w-40 bg-white/20" />
             ) : (
               <p className="text-sm font-semibold tracking-wide text-brand-200 uppercase">
-                {data?.academicYear ? `Academic year ${data.academicYear}` : 'Nursery – Grade 12'}
+                {schoolData.academicYear
+                  ? `Academic year ${schoolData.academicYear}`
+                  : 'Nursery – Grade 12'}
               </p>
             )}
 
@@ -65,16 +72,17 @@ export default function HomePage() {
                 <Skeleton className="h-12 w-full max-w-2xl bg-white/20" />
               ) : (
                 <>
-                  {data?.schoolName}
-                  <span className="block text-brand-200">Nursery through Grade 12, one portal.</span>
+                  {schoolData.schoolName || data?.schoolName}
+                  <span className="block text-brand-200">
+                    {schoolData.heroSubtitle || 'Nursery through Grade 12, one portal.'}
+                  </span>
                 </>
               )}
             </h1>
 
             <p className="mt-5 max-w-2xl text-brand-100">
-              Lessons, weighted assessments and report cards in one place. Administrators manage the
-              roster, teachers record marks against the school's grading policy, and students see
-              their results the moment they are published.
+              {schoolData.heroDescription ||
+                "Lessons, weighted assessments and report cards in one place. Administrators manage the roster, teachers record marks against the school's grading policy, and students see their results the moment they are published."}
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3">

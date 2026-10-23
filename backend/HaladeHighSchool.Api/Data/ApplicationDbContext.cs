@@ -245,15 +245,35 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.ToTable("Schools");
             entity.HasKey(school => school.Id);
             entity.Property(school => school.Name).HasMaxLength(200).IsRequired();
+            entity.Property(school => school.Slug).HasMaxLength(220).IsRequired();
             entity.Property(school => school.Code).HasMaxLength(50).IsRequired();
             entity.Property(school => school.ContactEmail).HasMaxLength(256).IsRequired();
             entity.Property(school => school.ContactPhone).HasMaxLength(50).IsRequired();
             entity.Property(school => school.Address).HasMaxLength(500).IsRequired();
+            entity.Property(school => school.HeroSubtitle)
+                .HasMaxLength(200)
+                .HasDefaultValue("Nursery through Grade 12, one portal.")
+                .IsRequired();
+            entity.Property(school => school.HeroDescription)
+                .HasMaxLength(2000)
+                .HasDefaultValue("Lessons, weighted assessments and report cards in one place.")
+                .IsRequired();
+            entity.Property(school => school.PrimaryColor)
+                .HasMaxLength(7)
+                .HasDefaultValue("#1e3a8a")
+                .IsRequired();
+            entity.Property(school => school.AcademicYear)
+                .HasMaxLength(9)
+                .HasDefaultValueSql(
+                    "to_char(CURRENT_DATE, 'YYYY') || '-' || to_char(CURRENT_DATE + INTERVAL '1 year', 'YYYY')")
+                .IsRequired();
+            entity.Property(school => school.IsActive).HasDefaultValue(true);
             entity.Property(school => school.SupportedGrades)
                 .HasColumnType("text[]")
                 .IsRequired();
             entity.Property(school => school.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.HasIndex(school => school.Code).IsUnique().HasDatabaseName("UQ_Schools_Code");
+            entity.HasIndex(school => school.Slug).IsUnique().HasDatabaseName("UQ_Schools_Slug");
         });
 
         builder.Entity<SchoolGradeSection>(entity =>
@@ -470,10 +490,18 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.Property(r => r.IssuedEmail).HasMaxLength(256);
 
             // Matches the filtered unique index: one open request per contact address.
-            entity.HasIndex(r => r.ContactEmail)
+            entity.HasIndex(r => new { r.SchoolId, r.ContactEmail })
                   .IsUnique()
                   .HasFilter("\"Status\" = 'Pending'")
-                  .HasDatabaseName("UQ_StudentRegistrationRequests_PendingContactEmail");
+                  .HasDatabaseName("UQ_StudentRegistrationRequests_School_PendingContactEmail");
+
+            entity.HasIndex(r => new { r.SchoolId, r.Status, r.SubmittedAt })
+                  .HasDatabaseName("IX_StudentRegistrationRequests_School_Status_SubmittedAt");
+
+            entity.HasOne(r => r.School)
+                  .WithMany()
+                  .HasForeignKey(r => r.SchoolId)
+                  .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasIndex(r => new { r.Status, r.SubmittedAt })
                   .HasDatabaseName("IX_StudentRegistrationRequests_Status_SubmittedAt");
@@ -596,6 +624,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.Property(a => a.AcademicYear).HasMaxLength(9).IsRequired();
             entity.Property(a => a.IsActive).HasDefaultValue(true);
             entity.Property(a => a.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.HasIndex(a => a.SchoolId).HasDatabaseName("IX_Assessments_SchoolId");
+            entity.HasAlternateKey(a => new { a.SchoolId, a.Id })
+                .HasName("AK_Assessments_SchoolId_Id");
 
             // Stored as text to satisfy FK_Assessments_AssessmentTypes_AssessmentType.
             entity.Property(a => a.AssessmentType)
@@ -617,6 +648,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
                   .WithMany(t => t.Assessments)
                   .HasForeignKey(a => a.TeacherId)
                   .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(a => a.School)
+                  .WithMany()
+                  .HasForeignKey(a => a.SchoolId)
+                  .OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<Mark>(entity =>
@@ -630,6 +666,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.Property(m => m.Score).HasPrecision(6, 2);
             entity.Property(m => m.Remark).HasMaxLength(300);
             entity.Property(m => m.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.HasIndex(m => m.SchoolId).HasDatabaseName("IX_Marks_SchoolId");
 
             entity.HasIndex(m => new { m.StudentId, m.AssessmentId })
                   .IsUnique()
@@ -642,7 +679,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
 
             entity.HasOne(m => m.Assessment)
                   .WithMany(a => a.Marks)
-                  .HasForeignKey(m => m.AssessmentId)
+                  .HasForeignKey(m => new { m.SchoolId, m.AssessmentId })
+                  .HasPrincipalKey(a => new { a.SchoolId, a.Id })
                   .OnDelete(DeleteBehavior.Cascade);
 
             // NO ACTION in SQL to avoid a multiple cascade path through Assessments.
@@ -654,6 +692,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.HasOne(m => m.EnteredByTeacher)
                   .WithMany()
                   .HasForeignKey(m => m.EnteredByTeacherId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(m => m.School)
+                  .WithMany()
+                  .HasForeignKey(m => m.SchoolId)
                   .OnDelete(DeleteBehavior.Restrict);
         });
     }
@@ -698,6 +741,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             builder.Entity<Event>(entity =>
             {
                   entity.ToTable("Events");
+                  entity.Property(e => e.ImageUrls)
+                      .HasColumnType("text[]")
+                      .HasDefaultValueSql("ARRAY[]::text[]")
+                      .IsRequired();
                   entity.Property(e => e.Title).HasMaxLength(200).IsRequired();
                   entity.Property(e => e.BannerImageUrl).HasMaxLength(500);
                   entity.Property(e => e.Category).HasMaxLength(50).HasDefaultValue("General").IsRequired();
@@ -713,10 +760,12 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
                   entity.HasIndex(e => e.StartsAt).HasDatabaseName("IX_Events_StartDate");
                   entity.HasIndex(e => e.Category).HasDatabaseName("IX_Events_Category");
                   entity.HasIndex(e => e.IsPublished).HasDatabaseName("IX_Events_IsActive");
+                  entity.HasIndex(e => e.SchoolId).HasDatabaseName("IX_Events_SchoolId");
 
                   entity.HasOne(e => e.GradeLevel).WithMany().HasForeignKey(e => e.GradeLevelId).OnDelete(DeleteBehavior.Restrict);
                   entity.HasOne(e => e.Section).WithMany().HasForeignKey(e => e.SectionId).OnDelete(DeleteBehavior.Restrict);
                   entity.HasOne(e => e.OrganizedByUser).WithMany().HasForeignKey(e => e.OrganizedByUserId).OnDelete(DeleteBehavior.SetNull);
+                  entity.HasOne(e => e.School).WithMany().HasForeignKey(e => e.SchoolId).OnDelete(DeleteBehavior.Restrict);
             });
 
             builder.Entity<EventRegistration>(entity =>

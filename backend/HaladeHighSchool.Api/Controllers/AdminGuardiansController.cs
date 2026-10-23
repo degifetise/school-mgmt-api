@@ -117,7 +117,9 @@ public class AdminGuardiansController : PortalControllerBase
     {
         var guardian = await _db.Guardians
             .AsNoTracking()
-            .Where(g => g.Id == request.GuardianId)
+            .Where(g => g.Id == request.GuardianId
+                && g.User != null
+                && g.User.SchoolId == CurrentSchoolId)
             .Select(g => new
             {
                 g.Id,
@@ -133,7 +135,12 @@ public class AdminGuardiansController : PortalControllerBase
 
         var studentExists = await _db.Students
             .AsNoTracking()
-            .AnyAsync(s => s.Id == request.StudentId && s.IsActive, cancellationToken);
+            .AnyAsync(
+                s => s.Id == request.StudentId
+                    && s.IsActive
+                    && s.User != null
+                    && s.User.SchoolId == CurrentSchoolId,
+                cancellationToken);
         if (!studentExists)
         {
             return NotFoundProblem($"Student {request.StudentId} was not found or is inactive.");
@@ -192,7 +199,12 @@ public class AdminGuardiansController : PortalControllerBase
             .Include(sg => sg.Guardian)
                 .ThenInclude(guardian => guardian!.User)
             .FirstOrDefaultAsync(
-                sg => sg.GuardianId == request.GuardianId && sg.StudentId == request.StudentId,
+                sg => sg.GuardianId == request.GuardianId
+                    && sg.StudentId == request.StudentId
+                    && sg.Guardian!.User != null
+                    && sg.Guardian.User.SchoolId == CurrentSchoolId
+                    && sg.Student!.User != null
+                    && sg.Student.User.SchoolId == CurrentSchoolId,
                 cancellationToken);
 
         if (link is null)
@@ -225,8 +237,17 @@ public class AdminGuardiansController : PortalControllerBase
         CancellationToken cancellationToken)
     {
         var link = await _db.StudentGuardians
+            .Include(sg => sg.Guardian)
+                .ThenInclude(guardian => guardian!.User)
+            .Include(sg => sg.Student)
+                .ThenInclude(student => student!.User)
             .FirstOrDefaultAsync(
-                sg => sg.GuardianId == guardianId && sg.StudentId == studentId,
+                sg => sg.GuardianId == guardianId
+                    && sg.StudentId == studentId
+                    && sg.Guardian!.User != null
+                    && sg.Guardian.User.SchoolId == CurrentSchoolId
+                    && sg.Student!.User != null
+                    && sg.Student.User.SchoolId == CurrentSchoolId,
                 cancellationToken);
 
         if (link is null)
@@ -243,14 +264,24 @@ public class AdminGuardiansController : PortalControllerBase
     private IQueryable<Guardian> GuardianQuery() =>
         _db.Guardians
             .AsNoTracking()
+            .Where(guardian => guardian.User != null && guardian.User.SchoolId == CurrentSchoolId)
             .Include(g => g.User)
-            .Include(g => g.StudentGuardians)
+            .Include(g => g.StudentGuardians.Where(link =>
+                link.Student != null
+                && link.Student.User != null
+                && link.Student.User.SchoolId == CurrentSchoolId))
                 .ThenInclude(link => link.Student)
                     .ThenInclude(student => student!.User)
-            .Include(g => g.StudentGuardians)
+            .Include(g => g.StudentGuardians.Where(link =>
+                link.Student != null
+                && link.Student.User != null
+                && link.Student.User.SchoolId == CurrentSchoolId))
                 .ThenInclude(link => link.Student)
                     .ThenInclude(student => student!.GradeLevel)
-            .Include(g => g.StudentGuardians)
+            .Include(g => g.StudentGuardians.Where(link =>
+                link.Student != null
+                && link.Student.User != null
+                && link.Student.User.SchoolId == CurrentSchoolId))
                 .ThenInclude(link => link.Student)
                     .ThenInclude(student => student!.Section);
 

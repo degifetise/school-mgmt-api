@@ -6,11 +6,11 @@ import AppRoutes from './routes/AppRoutes';
 export default function App() {
   return (
     <BrowserRouter>
-      <SchoolInfoProvider>
-        <AuthProvider>
+      <AuthProvider>
+        <SchoolInfoProvider>
           <AppRoutes />
-        </AuthProvider>
-      </SchoolInfoProvider>
+        </SchoolInfoProvider>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

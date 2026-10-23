@@ -32,6 +32,13 @@ function EventCard({ event, canComment, isAdmin, userRole, onEdit, onDelete, onS
   return (
     <motion.article initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="card overflow-hidden">
       {event.bannerUrl ? <img src={event.bannerUrl} alt="" className="h-44 w-full object-cover" /> : <div className="h-3 bg-brand-600" />}
+      {event.imageUrls?.length > 1 && (
+        <div className="flex gap-2 overflow-x-auto px-4 pt-3">
+          {event.imageUrls.slice(1).map((imageUrl) => (
+            <img key={imageUrl} src={imageUrl} alt="" className="h-16 w-24 shrink-0 rounded-md object-cover" />
+          ))}
+        </div>
+      )}
       <div className="space-y-4 p-5">
         <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-semibold tracking-wide text-brand-700 uppercase">{event.category}</p><h2 className={`mt-1 text-xl font-bold text-slate-900 ${event.status === 'Canceled' ? 'line-through' : ''}`}>{event.title}</h2></div><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(event.status)}`}>{event.status === 'Ongoing' && <span className="size-1.5 animate-pulse rounded-full bg-current" aria-hidden="true" />}{event.status}</span></div>
         {event.description && <p className="line-clamp-3 text-sm leading-6 text-slate-600">{event.description}</p>}
@@ -58,7 +65,7 @@ export default function EventsPage() {
   const [hiddenEventIds, setHiddenEventIds] = useState(() => new Set());
   const fetchEvents = useCallback(() => eventApi.list(filters), [filters]);
   const { data, error, loading, reload, reloading } = useApiResource(fetchEvents, [filters]);
-  const isAdmin = hasRole('Admin');
+  const isAdmin = hasRole('Admin', 'SchoolAdmin');
   const isTeacher = hasRole('Teacher');
   const isStudent = hasRole('Student');
   const canComment = isStudent || isTeacher || isAdmin;
@@ -76,7 +83,7 @@ export default function EventsPage() {
 
   const handleCreate = async (payload) => {
     try {
-      await eventApi.create({ title: payload.title, description: payload.description, category: payload.category, location: payload.venue, startDate: new Date(`${payload.startDate}T${payload.startTime}`).toISOString(), endDate: new Date(`${payload.endDate}T${payload.endTime}`).toISOString(), maxAttendees: payload.capacity, targetStakeholders: payload.targetStakeholders, targetGradeIds: payload.targetGradeIds, targetSectionIds: payload.targetSectionIds });
+      await eventApi.create({ title: payload.title, description: payload.description, category: payload.category, location: payload.venue, startDate: new Date(`${payload.startDate}T${payload.startTime}`).toISOString(), endDate: new Date(`${payload.endDate}T${payload.endTime}`).toISOString(), maxAttendees: payload.capacity, targetStakeholders: payload.targetStakeholders, targetGradeIds: payload.targetGradeIds, targetSectionIds: payload.targetSectionIds, images: payload.images });
       setIsCreateOpen(false);
       setActionNotice({ variant: 'success', message: 'Event created successfully.' });
       await reload();
@@ -88,7 +95,7 @@ export default function EventsPage() {
 
   const handleUpdate = async (payload) => {
     try {
-      await eventApi.update(editingEvent.id, { title: payload.title, description: payload.description, category: payload.category, location: payload.venue, startDate: new Date(`${payload.startDate}T${payload.startTime}`).toISOString(), endDate: new Date(`${payload.endDate}T${payload.endTime}`).toISOString(), maxAttendees: payload.capacity, isActive: payload.isActive, targetStakeholders: payload.targetStakeholders, targetGradeIds: payload.targetGradeIds, targetSectionIds: payload.targetSectionIds });
+      await eventApi.update(editingEvent.id, { title: payload.title, description: payload.description, category: payload.category, location: payload.venue, startDate: new Date(`${payload.startDate}T${payload.startTime}`).toISOString(), endDate: new Date(`${payload.endDate}T${payload.endTime}`).toISOString(), maxAttendees: payload.capacity, isActive: payload.isActive, targetStakeholders: payload.targetStakeholders, targetGradeIds: payload.targetGradeIds, targetSectionIds: payload.targetSectionIds, images: payload.images });
       setEditingEvent(null);
       setActionNotice({ variant: 'success', message: 'Event updated successfully.' });
       await reload();

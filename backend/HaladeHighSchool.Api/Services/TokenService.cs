@@ -61,6 +61,19 @@ public class TokenService : ITokenService
             return null;
         }
 
+        var isSuperAdmin = await (
+            from userRole in _db.UserRoles
+            join role in _db.Roles on userRole.RoleId equals role.Id
+            where userRole.UserId == stored.UserId && role.Name == Roles.SuperAdmin
+            select userRole.UserId)
+            .AnyAsync(cancellationToken);
+        if (!isSuperAdmin && !await _db.Schools.AnyAsync(
+                school => school.Id == stored.User.SchoolId && school.IsActive,
+                cancellationToken))
+        {
+            return null;
+        }
+
         var replacement = await IssueRefreshTokenAsync(stored.UserId, ipAddress, cancellationToken, saveChanges: false);
 
         stored.RevokedAt = DateTime.UtcNow;
@@ -141,6 +154,7 @@ public class TokenService : ITokenService
         return new UserProfileResponse
         {
             Id = user.Id,
+            SchoolId = user.SchoolId,
             Email = user.Email ?? string.Empty,
             FullName = user.FullName,
             ProfileImageUrl = user.ProfileImageUrl,

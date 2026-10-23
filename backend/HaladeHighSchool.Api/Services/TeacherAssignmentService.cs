@@ -14,21 +14,25 @@ public interface ITeacherAssignmentService
 {
     Task<IReadOnlyList<TeacherSectionAssignmentResponse>?> GetSectionAssignmentsAsync(
         int teacherId,
+        Guid schoolId,
         CancellationToken cancellationToken = default);
 
     Task<TeacherSectionAssignmentsResult> AddSectionAssignmentsAsync(
         int teacherId,
         IReadOnlyList<TeacherSectionAssignmentRequestItem> assignments,
+        Guid schoolId,
         CancellationToken cancellationToken = default);
 
     Task<TeacherSectionAssignmentsResult> ReplaceSectionAssignmentsAsync(
         int teacherId,
         IReadOnlyList<TeacherSectionAssignmentRequestItem> assignments,
+        Guid schoolId,
         CancellationToken cancellationToken = default);
 
     Task<bool?> RemoveSectionAssignmentAsync(
         int teacherId,
         int sectionId,
+        Guid schoolId,
         CancellationToken cancellationToken = default);
 }
 
@@ -36,15 +40,24 @@ public sealed class TeacherAssignmentService(ApplicationDbContext db) : ITeacher
 {
     public async Task<IReadOnlyList<TeacherSectionAssignmentResponse>?> GetSectionAssignmentsAsync(
         int teacherId,
+        Guid schoolId,
         CancellationToken cancellationToken = default)
     {
-        if (!await db.Teachers.AnyAsync(teacher => teacher.Id == teacherId, cancellationToken))
+        if (!await db.Teachers.AnyAsync(
+                teacher => teacher.Id == teacherId
+                    && teacher.User != null
+                    && teacher.User.SchoolId == schoolId,
+                cancellationToken))
         {
             return null;
         }
 
         return await ProjectAssignments(db.TeacherSectionAssignments.AsNoTracking()
-                .Where(assignment => assignment.TeacherId == teacherId))
+                .Where(assignment => assignment.TeacherId == teacherId
+                    && db.SchoolGradeSections.Any(link =>
+                        link.SchoolId == schoolId
+                        && link.GradeLevelId == assignment.GradeLevelId
+                        && link.SectionId == assignment.SectionId)))
             .OrderBy(assignment => assignment.GradeLevelName)
             .ThenBy(assignment => assignment.SectionName)
             .ToListAsync(cancellationToken);
@@ -53,27 +66,39 @@ public sealed class TeacherAssignmentService(ApplicationDbContext db) : ITeacher
     public Task<TeacherSectionAssignmentsResult> AddSectionAssignmentsAsync(
         int teacherId,
         IReadOnlyList<TeacherSectionAssignmentRequestItem> assignments,
+        Guid schoolId,
         CancellationToken cancellationToken = default) =>
-        SaveAssignmentsAsync(teacherId, assignments, replace: false, cancellationToken);
+        SaveAssignmentsAsync(teacherId, assignments, schoolId, replace: false, cancellationToken);
 
     public Task<TeacherSectionAssignmentsResult> ReplaceSectionAssignmentsAsync(
         int teacherId,
         IReadOnlyList<TeacherSectionAssignmentRequestItem> assignments,
+        Guid schoolId,
         CancellationToken cancellationToken = default) =>
-        SaveAssignmentsAsync(teacherId, assignments, replace: true, cancellationToken);
+        SaveAssignmentsAsync(teacherId, assignments, schoolId, replace: true, cancellationToken);
 
     public async Task<bool?> RemoveSectionAssignmentAsync(
         int teacherId,
         int sectionId,
+        Guid schoolId,
         CancellationToken cancellationToken = default)
     {
-        if (!await db.Teachers.AnyAsync(teacher => teacher.Id == teacherId, cancellationToken))
+        if (!await db.Teachers.AnyAsync(
+                teacher => teacher.Id == teacherId
+                    && teacher.User != null
+                    && teacher.User.SchoolId == schoolId,
+                cancellationToken))
         {
             return null;
         }
 
         var matching = await db.TeacherSectionAssignments
-            .Where(assignment => assignment.TeacherId == teacherId && assignment.SectionId == sectionId)
+            .Where(assignment => assignment.TeacherId == teacherId
+                && assignment.SectionId == sectionId
+                && db.SchoolGradeSections.Any(link =>
+                    link.SchoolId == schoolId
+                    && link.GradeLevelId == assignment.GradeLevelId
+                    && link.SectionId == assignment.SectionId))
             .ToListAsync(cancellationToken);
         if (matching.Count == 0)
         {
@@ -88,10 +113,15 @@ public sealed class TeacherAssignmentService(ApplicationDbContext db) : ITeacher
     private async Task<TeacherSectionAssignmentsResult> SaveAssignmentsAsync(
         int teacherId,
         IReadOnlyList<TeacherSectionAssignmentRequestItem> requested,
+        Guid schoolId,
         bool replace,
         CancellationToken cancellationToken)
     {
-        if (!await db.Teachers.AnyAsync(teacher => teacher.Id == teacherId, cancellationToken))
+        if (!await db.Teachers.AnyAsync(
+                teacher => teacher.Id == teacherId
+                    && teacher.User != null
+                    && teacher.User.SchoolId == schoolId,
+                cancellationToken))
         {
             return new(false, false, []);
         }
@@ -101,9 +131,10 @@ public sealed class TeacherAssignmentService(ApplicationDbContext db) : ITeacher
             .ToArray();
         var gradeLevelIds = normalized.Select(item => item.GradeLevelId).Distinct().ToArray();
         var sectionIds = normalized.Select(item => item.SectionId).Distinct().ToArray();
-        var validPairs = await db.GradeLevelSections
+        var validPairs = await db.SchoolGradeSections
             .AsNoTracking()
-            .Where(link => gradeLevelIds.Contains(link.GradeLevelId)
+            .Where(link => link.SchoolId == schoolId
+                && gradeLevelIds.Contains(link.GradeLevelId)
                 && sectionIds.Contains(link.SectionId)
                 && link.GradeLevel!.IsActive
                 && link.Section!.IsActive)
@@ -119,7 +150,11 @@ public sealed class TeacherAssignmentService(ApplicationDbContext db) : ITeacher
         }
 
         var existing = await db.TeacherSectionAssignments
-            .Where(assignment => assignment.TeacherId == teacherId)
+            .Where(assignment => assignment.TeacherId == teacherId
+                && db.SchoolGradeSections.Any(link =>
+                    link.SchoolId == schoolId
+                    && link.GradeLevelId == assignment.GradeLevelId
+                    && link.SectionId == assignment.SectionId))
             .ToListAsync(cancellationToken);
 
         if (replace)
@@ -154,7 +189,11 @@ public sealed class TeacherAssignmentService(ApplicationDbContext db) : ITeacher
 
         await db.SaveChangesAsync(cancellationToken);
         var result = await ProjectAssignments(db.TeacherSectionAssignments.AsNoTracking()
-                .Where(assignment => assignment.TeacherId == teacherId))
+                .Where(assignment => assignment.TeacherId == teacherId
+                    && db.SchoolGradeSections.Any(link =>
+                        link.SchoolId == schoolId
+                        && link.GradeLevelId == assignment.GradeLevelId
+                        && link.SectionId == assignment.SectionId)))
             .OrderBy(assignment => assignment.GradeLevelName)
             .ThenBy(assignment => assignment.SectionName)
             .ToListAsync(cancellationToken);

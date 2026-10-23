@@ -74,4 +74,53 @@ public sealed record SchoolResponse(
     string ContactPhone,
     string Address,
     string AdminFullName,
-    string AdminEmail);
+    string AdminEmail,
+    string Slug);
+
+/// <summary>Administrator currently assigned to a school.</summary>
+public sealed record SchoolAdminResponse(string Id, string FullName, string Email);
+
+/// <summary>School tenant and its assigned administrator, if any.</summary>
+public sealed record SuperAdminSchoolResponse(
+    Guid SchoolId,
+    string Name,
+    DateTimeOffset CreatedAt,
+    bool IsActive,
+    SchoolAdminResponse? Admin);
+
+/// <summary>Assigns an existing user account as a school's administrator.</summary>
+public sealed record AssignSchoolAdminRequest
+{
+    [Required, EmailAddress, MaxLength(256)]
+    public required string Email { get; init; }
+}
+
+/// <summary>The resulting active state for one school tenant.</summary>
+public sealed record SchoolStatusResponse(Guid SchoolId, bool IsActive);
+
+/// <summary>Updates only the name of one school tenant.</summary>
+public sealed record UpdateSchoolNameRequest
+{
+    [Required, MaxLength(200)]
+    public required string Name { get; init; }
+}
+
+/// <summary>Updated name of the addressed school tenant.</summary>
+public sealed record SchoolNameResponse(Guid SchoolId, string Name);
+
+/// <summary>One grade available for a school's public registration form.</summary>
+public sealed record SchoolRegistrationGradeResponse(
+    int Id,
+    string Name,
+    int Level,
+    IReadOnlyList<SchoolRegistrationSectionResponse> Sections);
+
+/// <summary>A section option available for public registration.</summary>
+public sealed record SchoolRegistrationSectionResponse(int Id, string Name);
+
+/// <summary>Public registration details resolved from a school URL slug.</summary>
+public sealed record PublicSchoolRegistrationResponse(
+    string Name,
+    string Slug,
+    bool RegistrationOpen,
+    IReadOnlyList<SchoolRegistrationGradeResponse> Grades);

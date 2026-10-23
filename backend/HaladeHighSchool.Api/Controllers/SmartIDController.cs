@@ -132,7 +132,10 @@ public sealed class SmartIDController : PortalControllerBase
                 .Include(student => student.User)
                 .Include(student => student.GradeLevel)
                 .Include(student => student.Section)
-                .Where(student => student.IsActive && student.UserId != null);
+                .Where(student => student.IsActive
+                    && student.UserId != null
+                    && student.User != null
+                    && student.User.SchoolId == CurrentSchoolId);
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
                 students = students.Where(student =>
@@ -156,7 +159,10 @@ public sealed class SmartIDController : PortalControllerBase
         {
             var teachers = _db.Teachers.AsNoTracking()
                 .Include(teacher => teacher.User)
-                .Where(teacher => teacher.IsActive && teacher.UserId != null);
+                .Where(teacher => teacher.IsActive
+                    && teacher.UserId != null
+                    && teacher.User != null
+                    && teacher.User.SchoolId == CurrentSchoolId);
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
                 teachers = teachers.Where(teacher =>
@@ -188,10 +194,11 @@ public sealed class SmartIDController : PortalControllerBase
             }
 
             candidates.AddRange(staffUsers
-                .Where(user => string.IsNullOrWhiteSpace(searchTerm)
+                .Where(user => user.SchoolId == CurrentSchoolId
+                    && (string.IsNullOrWhiteSpace(searchTerm)
                     || user.Id.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
                     || (user.Email?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false)
-                    || user.FullName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+                    || user.FullName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)))
                 .Take(MaximumBatchSize)
                 .Select(user => new AdminLookupCandidate(
                     user,
@@ -248,6 +255,10 @@ public sealed class SmartIDController : PortalControllerBase
 
             var user = await _userManager.FindByIdAsync(userId);
             if (user is null)
+            {
+                return NotFoundProblem("The requested account was not found.");
+            }
+            if (user.SchoolId != CurrentSchoolId)
             {
                 return NotFoundProblem("The requested account was not found.");
             }
@@ -420,7 +431,8 @@ public sealed class SmartIDController : PortalControllerBase
             {
                 var staffUsers = (await _userManager.GetUsersInRoleAsync(Roles.Staff))
                     .Concat(await _userManager.GetUsersInRoleAsync(Roles.Admin))
-                    .DistinctBy(user => user.Id);
+                    .DistinctBy(user => user.Id)
+                    .Where(user => user.SchoolId == CurrentSchoolId);
                 userIds = staffUsers
                     .Select(user => user.Id)
                     .Take(MaximumBatchSize + 1)
@@ -436,6 +448,8 @@ public sealed class SmartIDController : PortalControllerBase
                 var departmentFilter = department.Trim();
                 userIds = await _db.Teachers.AsNoTracking()
                     .Where(teacher => teacher.IsActive && teacher.UserId != null
+                        && teacher.User != null
+                        && teacher.User.SchoolId == CurrentSchoolId
                         && teacher.Specialization != null
                         && teacher.Specialization.Contains(departmentFilter))
                     .OrderBy(teacher => teacher.EmployeeId)
@@ -450,7 +464,11 @@ public sealed class SmartIDController : PortalControllerBase
                     return BadRequestProblem("Filter required", "Provide userIds or a grade/section filter.");
                 }
 
-                var students = _db.Students.AsNoTracking().Where(student => student.IsActive && student.UserId != null);
+                var students = _db.Students.AsNoTracking()
+                    .Where(student => student.IsActive
+                        && student.UserId != null
+                        && student.User != null
+                        && student.User.SchoolId == CurrentSchoolId);
                 if (!string.IsNullOrWhiteSpace(grade))
                 {
                     var gradeFilter = grade.Trim();
@@ -482,7 +500,9 @@ public sealed class SmartIDController : PortalControllerBase
         }
 
         var cardRows = await CardDetailsQuery()
-            .Where(card => userIds.Contains(card.UserId))
+            .Where(card => userIds.Contains(card.UserId)
+                && card.User != null
+                && card.User.SchoolId == CurrentSchoolId)
             .ToListAsync(cancellationToken);
         var cardsByUserId = cardRows
             .Where(card => card.User is not null)
@@ -525,7 +545,10 @@ public sealed class SmartIDController : PortalControllerBase
             }
 
             var students = _db.Students.AsNoTracking()
-                .Where(student => student.IsActive && student.UserId != null);
+                .Where(student => student.IsActive
+                    && student.UserId != null
+                    && student.User != null
+                    && student.User.SchoolId == CurrentSchoolId);
             if (requestedIds is { Count: > 0 })
             {
                 students = students.Where(student => requestedIds.Contains(student.UserId!));
@@ -555,7 +578,10 @@ public sealed class SmartIDController : PortalControllerBase
             }
 
             var teachers = _db.Teachers.AsNoTracking()
-                .Where(teacher => teacher.IsActive && teacher.UserId != null);
+                .Where(teacher => teacher.IsActive
+                    && teacher.UserId != null
+                    && teacher.User != null
+                    && teacher.User.SchoolId == CurrentSchoolId);
             if (requestedIds is { Count: > 0 })
             {
                 teachers = teachers.Where(teacher => requestedIds.Contains(teacher.UserId!));
@@ -575,7 +601,8 @@ public sealed class SmartIDController : PortalControllerBase
         {
             var staffUsers = (await _userManager.GetUsersInRoleAsync(Roles.Staff))
                 .Concat(await _userManager.GetUsersInRoleAsync(Roles.Admin))
-                .DistinctBy(user => user.Id);
+                .DistinctBy(user => user.Id)
+                .Where(user => user.SchoolId == CurrentSchoolId);
             eligibleIds = staffUsers
                 .Where(user => requestedIds is null or { Count: 0 } || requestedIds.Contains(user.Id))
                 .Select(user => user.Id)
@@ -589,7 +616,9 @@ public sealed class SmartIDController : PortalControllerBase
         }
 
         var alreadyGeneratedIds = await _db.SmartCards.AsNoTracking()
-            .Where(card => eligibleIds.Contains(card.UserId))
+            .Where(card => eligibleIds.Contains(card.UserId)
+                && card.User != null
+                && card.User.SchoolId == CurrentSchoolId)
             .Select(card => card.UserId)
             .ToHashSetAsync(cancellationToken);
         var cardType = selectedRole switch
@@ -602,7 +631,7 @@ public sealed class SmartIDController : PortalControllerBase
         foreach (var userId in eligibleIds.Where(userId => !alreadyGeneratedIds.Contains(userId)))
         {
             var user = await _userManager.FindByIdAsync(userId);
-            if (user is not null)
+            if (user is not null && user.SchoolId == CurrentSchoolId)
             {
                 await _cardService.AddCardAsync(user, cardType, cancellationToken);
             }
@@ -610,7 +639,9 @@ public sealed class SmartIDController : PortalControllerBase
 
         await _db.SaveChangesAsync(cancellationToken);
         var cards = await CardDetailsQuery()
-            .Where(card => eligibleIds.Contains(card.UserId))
+            .Where(card => eligibleIds.Contains(card.UserId)
+                && card.User != null
+                && card.User.SchoolId == CurrentSchoolId)
             .ToListAsync(cancellationToken);
         var cardsByUserId = cards
             .Where(card => card.User is not null)
@@ -632,7 +663,10 @@ public sealed class SmartIDController : PortalControllerBase
         }
 
         var card = await _db.SmartCards
-            .FirstOrDefaultAsync(item => item.UserId == userId, cancellationToken);
+            .FirstOrDefaultAsync(item => item.UserId == userId
+                && item.User != null
+                && item.User.SchoolId == CurrentSchoolId,
+                cancellationToken);
         if (card is null)
         {
             return NotFoundProblem("No Smart ID card is available for this user.");
@@ -651,7 +685,9 @@ public sealed class SmartIDController : PortalControllerBase
         UpdateSmartIDCardRequest request,
         CancellationToken cancellationToken)
     {
-        var card = await _db.SmartCards.FirstOrDefaultAsync(item => item.UserId == userId, cancellationToken);
+        var card = await _db.SmartCards.FirstOrDefaultAsync(item => item.UserId == userId
+            && item.User != null
+            && item.User.SchoolId == CurrentSchoolId, cancellationToken);
         if (card is null)
         {
             return NotFoundProblem("No Smart ID card is available for this user.");
@@ -659,6 +695,10 @@ public sealed class SmartIDController : PortalControllerBase
 
         var user = await _userManager.FindByIdAsync(userId);
         if (user is null)
+        {
+            return NotFoundProblem("The cardholder account was not found.");
+        }
+        if (user.SchoolId != CurrentSchoolId)
         {
             return NotFoundProblem("The cardholder account was not found.");
         }
@@ -781,7 +821,9 @@ public sealed class SmartIDController : PortalControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> DeleteAdminCard(string userId, CancellationToken cancellationToken)
     {
-        var card = await _db.SmartCards.FirstOrDefaultAsync(item => item.UserId == userId, cancellationToken);
+        var card = await _db.SmartCards.FirstOrDefaultAsync(item => item.UserId == userId
+            && item.User != null
+            && item.User.SchoolId == CurrentSchoolId, cancellationToken);
         if (card is null)
         {
             return NotFoundProblem("No Smart ID card is available for this user.");
@@ -1012,6 +1054,10 @@ public sealed class SmartIDController : PortalControllerBase
         {
             return NotFoundProblem("The requested user was not found.");
         }
+        if (user.SchoolId != CurrentSchoolId)
+        {
+            return NotFoundProblem("The requested user was not found.");
+        }
 
         string photoUrl;
         try
@@ -1065,6 +1111,10 @@ public sealed class SmartIDController : PortalControllerBase
     {
         var user = await _userManager.FindByIdAsync(userId);
         if (user is null)
+        {
+            return NotFoundProblem("The requested user was not found.");
+        }
+        if (user.SchoolId != CurrentSchoolId)
         {
             return NotFoundProblem("The requested user was not found.");
         }

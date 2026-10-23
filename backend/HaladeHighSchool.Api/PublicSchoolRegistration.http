@@ -1,0 +1,17 @@
+@baseUrl = http://localhost:5006
+@schoolSlug = example-high-school
+
+### Resolve a school registration page and its configured grades/sections
+GET {{baseUrl}}/api/public/schools/slug/{{schoolSlug}}
+
+### Submit a student registration to this school only
+POST {{baseUrl}}/api/public/schools/slug/{{schoolSlug}}/register
+Content-Type: application/json
+
+{
+  "requestedRole": "Student",
+  "fullName": "Alex Example",
+  "email": "alex@example.com",
+  "gradeLevelId": 1,
+  "sectionId": 1
+}

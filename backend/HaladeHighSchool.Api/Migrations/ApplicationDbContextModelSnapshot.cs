@@ -242,6 +242,9 @@ namespace HaladeHighSchool.Api.Migrations
                         .HasPrecision(6, 2)
                         .HasColumnType("numeric(6,2)");
 
+                    b.Property<Guid>("SchoolId")
+                        .HasColumnType("uuid");
+
                     b.Property<int?>("SectionId")
                         .HasColumnType("integer");
 
@@ -257,6 +260,12 @@ namespace HaladeHighSchool.Api.Migrations
                         .HasColumnType("character varying(200)");
 
                     b.HasKey("Id");
+
+                    b.HasAlternateKey("SchoolId", "Id")
+                        .HasName("AK_Assessments_SchoolId_Id");
+
+                    b.HasIndex("SchoolId")
+                        .HasDatabaseName("IX_Assessments_SchoolId");
 
                     b.HasIndex("SectionId");
 
@@ -383,6 +392,12 @@ namespace HaladeHighSchool.Api.Migrations
                     b.Property<int?>("GradeLevelId")
                         .HasColumnType("integer");
 
+                    b.PrimitiveCollection<string[]>("ImageUrls")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text[]")
+                        .HasDefaultValueSql("ARRAY[]::text[]");
+
                     b.Property<bool>("IsCancelled")
                         .HasColumnType("boolean");
 
@@ -410,6 +425,9 @@ namespace HaladeHighSchool.Api.Migrations
                     b.Property<DateTime?>("RegistrationDeadline")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("RegistrationDeadline");
+
+                    b.Property<Guid>("SchoolId")
+                        .HasColumnType("uuid");
 
                     b.Property<int?>("SectionId")
                         .HasColumnType("integer");
@@ -459,6 +477,9 @@ namespace HaladeHighSchool.Api.Migrations
                         .HasDatabaseName("IX_Events_IsActive");
 
                     b.HasIndex("OrganizedByUserId");
+
+                    b.HasIndex("SchoolId")
+                        .HasDatabaseName("IX_Events_SchoolId");
 
                     b.HasIndex("SectionId");
 
@@ -839,6 +860,9 @@ namespace HaladeHighSchool.Api.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
 
+                    b.Property<Guid>("SchoolId")
+                        .HasColumnType("uuid");
+
                     b.Property<decimal>("Score")
                         .HasPrecision(6, 2)
                         .HasColumnType("numeric(6,2)");
@@ -854,11 +878,14 @@ namespace HaladeHighSchool.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AssessmentId");
-
                     b.HasIndex("EnteredByTeacherId");
 
+                    b.HasIndex("SchoolId")
+                        .HasDatabaseName("IX_Marks_SchoolId");
+
                     b.HasIndex("SubjectId");
+
+                    b.HasIndex("SchoolId", "AssessmentId");
 
                     b.HasIndex("StudentId", "AssessmentId")
                         .IsUnique()
@@ -1064,6 +1091,13 @@ namespace HaladeHighSchool.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("AcademicYear")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(9)
+                        .HasColumnType("character varying(9)")
+                        .HasDefaultValueSql("to_char(CURRENT_DATE, 'YYYY') || '-' || to_char(CURRENT_DATE + INTERVAL '1 year', 'YYYY')");
+
                     b.Property<string>("Address")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -1089,10 +1123,41 @@ namespace HaladeHighSchool.Api.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+                    b.Property<string>("HeroDescription")
+                        .ValueGeneratedOnAdd()
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasDefaultValue("Lessons, weighted assessments and report cards in one place.");
+
+                    b.Property<string>("HeroSubtitle")
+                        .ValueGeneratedOnAdd()
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasDefaultValue("Nursery through Grade 12, one portal.");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<string>("PrimaryColor")
+                        .ValueGeneratedOnAdd()
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
+                        .HasDefaultValue("#1e3a8a");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(220)
+                        .HasColumnType("character varying(220)");
 
                     b.PrimitiveCollection<string[]>("SupportedGrades")
                         .IsRequired()
@@ -1103,6 +1168,10 @@ namespace HaladeHighSchool.Api.Migrations
                     b.HasIndex("Code")
                         .IsUnique()
                         .HasDatabaseName("UQ_Schools_Code");
+
+                    b.HasIndex("Slug")
+                        .IsUnique()
+                        .HasDatabaseName("UQ_Schools_Slug");
 
                     b.ToTable("Schools", (string)null);
                 });
@@ -1507,6 +1576,9 @@ namespace HaladeHighSchool.Api.Migrations
                         .HasMaxLength(450)
                         .HasColumnType("character varying(450)");
 
+                    b.Property<Guid>("SchoolId")
+                        .HasColumnType("uuid");
+
                     b.Property<int?>("SectionId")
                         .HasColumnType("integer");
 
@@ -1522,19 +1594,22 @@ namespace HaladeHighSchool.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ContactEmail")
-                        .IsUnique()
-                        .HasDatabaseName("UQ_StudentRegistrationRequests_PendingContactEmail")
-                        .HasFilter("\"Status\" = 'Pending'");
-
                     b.HasIndex("CreatedStudentId");
 
                     b.HasIndex("SectionId");
 
                     b.HasIndex("GradeLevelId", "SectionId");
 
+                    b.HasIndex("SchoolId", "ContactEmail")
+                        .IsUnique()
+                        .HasDatabaseName("UQ_StudentRegistrationRequests_School_PendingContactEmail")
+                        .HasFilter("\"Status\" = 'Pending'");
+
                     b.HasIndex("Status", "SubmittedAt")
                         .HasDatabaseName("IX_StudentRegistrationRequests_Status_SubmittedAt");
+
+                    b.HasIndex("SchoolId", "Status", "SubmittedAt")
+                        .HasDatabaseName("IX_StudentRegistrationRequests_School_Status_SubmittedAt");
 
                     b.ToTable("StudentRegistrationRequests", (string)null);
                 });
@@ -1947,6 +2022,12 @@ namespace HaladeHighSchool.Api.Migrations
 
             modelBuilder.Entity("HaladeHighSchool.Api.Models.Assessment", b =>
                 {
+                    b.HasOne("HaladeHighSchool.Api.Models.School", "School")
+                        .WithMany()
+                        .HasForeignKey("SchoolId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("HaladeHighSchool.Api.Models.Section", "Section")
                         .WithMany()
                         .HasForeignKey("SectionId")
@@ -1962,6 +2043,8 @@ namespace HaladeHighSchool.Api.Migrations
                         .WithMany("Assessments")
                         .HasForeignKey("TeacherId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("School");
 
                     b.Navigation("Section");
 
@@ -2000,6 +2083,12 @@ namespace HaladeHighSchool.Api.Migrations
                         .HasForeignKey("OrganizedByUserId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("HaladeHighSchool.Api.Models.School", "School")
+                        .WithMany()
+                        .HasForeignKey("SchoolId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("HaladeHighSchool.Api.Models.Section", "Section")
                         .WithMany()
                         .HasForeignKey("SectionId")
@@ -2008,6 +2097,8 @@ namespace HaladeHighSchool.Api.Migrations
                     b.Navigation("GradeLevel");
 
                     b.Navigation("OrganizedByUser");
+
+                    b.Navigation("School");
 
                     b.Navigation("Section");
                 });
@@ -2143,15 +2234,15 @@ namespace HaladeHighSchool.Api.Migrations
 
             modelBuilder.Entity("HaladeHighSchool.Api.Models.Mark", b =>
                 {
-                    b.HasOne("HaladeHighSchool.Api.Models.Assessment", "Assessment")
-                        .WithMany("Marks")
-                        .HasForeignKey("AssessmentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.HasOne("HaladeHighSchool.Api.Models.Teacher", "EnteredByTeacher")
                         .WithMany()
                         .HasForeignKey("EnteredByTeacherId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HaladeHighSchool.Api.Models.School", "School")
+                        .WithMany()
+                        .HasForeignKey("SchoolId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -2167,9 +2258,18 @@ namespace HaladeHighSchool.Api.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("HaladeHighSchool.Api.Models.Assessment", "Assessment")
+                        .WithMany("Marks")
+                        .HasForeignKey("SchoolId", "AssessmentId")
+                        .HasPrincipalKey("SchoolId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("Assessment");
 
                     b.Navigation("EnteredByTeacher");
+
+                    b.Navigation("School");
 
                     b.Navigation("Student");
 
@@ -2332,6 +2432,12 @@ namespace HaladeHighSchool.Api.Migrations
                         .HasForeignKey("GradeLevelId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("HaladeHighSchool.Api.Models.School", "School")
+                        .WithMany()
+                        .HasForeignKey("SchoolId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("HaladeHighSchool.Api.Models.Section", "Section")
                         .WithMany()
                         .HasForeignKey("SectionId")
@@ -2347,6 +2453,8 @@ namespace HaladeHighSchool.Api.Migrations
                     b.Navigation("GradeLevel");
 
                     b.Navigation("GradeLevelSection");
+
+                    b.Navigation("School");
 
                     b.Navigation("Section");
                 });

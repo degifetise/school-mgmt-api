@@ -20,13 +20,18 @@ import { useSchoolInfo } from '../../context/SchoolInfoContext';
 import { notificationApi } from '../../services/endpoints';
 import { navItemsFor } from './navigation';
 
-
 const ROLE_STYLE = {
   [ROLES.admin]: { chip: 'bg-amber-400/20 text-amber-100 ring-amber-300/30', Icon: ShieldCheck },
-  [ROLES.teacher]: { chip: 'bg-emerald-400/20 text-emerald-100 ring-emerald-300/30', Icon: BadgeCheck },
+  [ROLES.teacher]: {
+    chip: 'bg-emerald-400/20 text-emerald-100 ring-emerald-300/30',
+    Icon: BadgeCheck,
+  },
   [ROLES.staff]: { chip: 'bg-indigo-400/20 text-indigo-100 ring-indigo-300/30', Icon: IdCard },
   [ROLES.student]: { chip: 'bg-sky-400/20 text-sky-100 ring-sky-300/30', Icon: GraduationCap },
-  [ROLES.guardian]: { chip: 'bg-violet-400/20 text-violet-100 ring-violet-300/30', Icon: UsersRound },
+  [ROLES.guardian]: {
+    chip: 'bg-violet-400/20 text-violet-100 ring-violet-300/30',
+    Icon: UsersRound,
+  },
 };
 
 const FALLBACK_STYLE = { chip: 'bg-white/15 text-white ring-white/20', Icon: IdCard };
@@ -56,7 +61,6 @@ export function RoleBadge({ role, className = '' }) {
   );
 }
 
-
 function IdentityLine({ user, roles }) {
   const identifier = user?.studentIdNumber ?? user?.employeeId;
 
@@ -66,14 +70,13 @@ function IdentityLine({ user, roles }) {
         <RoleBadge key={role} role={role} />
       ))}
       {identifier && (
-        <span className="font-mono text-[11px] text-brand-200" title="Identifier">
+        <span className="font-mono text-[11px] text-brand-200 " title="Identifier">
           {identifier}
         </span>
       )}
     </span>
   );
 }
-
 
 export default function TopNavBar() {
   const { user, roles, isAuthenticated, logout } = useAuth();
@@ -131,21 +134,25 @@ export default function TopNavBar() {
 
     let cancelled = false;
     setNotificationBusy(true);
-    notificationApi.list()
+    notificationApi
+      .list()
       .then((result) => {
         if (!cancelled) {
-          setNotifications(Array.isArray(result) ? result : result?.items ?? []);
+          setNotifications(Array.isArray(result) ? result : (result?.items ?? []));
           setNotificationError('');
         }
       })
       .catch((error) => {
-        if (!cancelled) setNotificationError(error.friendlyMessage ?? 'Notifications could not be loaded.');
+        if (!cancelled)
+          setNotificationError(error.friendlyMessage ?? 'Notifications could not be loaded.');
       })
       .finally(() => {
         if (!cancelled) setNotificationBusy(false);
       });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [notificationOpen]);
 
   // Any navigation closes both overlays, including a click on the link you are already on.
@@ -196,14 +203,19 @@ export default function TopNavBar() {
     try {
       await notificationApi.markRead(notification.id);
       notificationCountVersion.current += 1;
-      setNotifications((current) => current.map((item) =>
-        item.id === notification.id ? { ...item, readAt: new Date().toISOString() } : item));
+      setNotifications((current) =>
+        current.map((item) =>
+          item.id === notification.id ? { ...item, readAt: new Date().toISOString() } : item
+        )
+      );
       setUnreadCount((count) => Math.max(0, count - 1));
       setNotificationError('');
       if (notification.targetUrl) navigate(notification.targetUrl);
       setNotificationOpen(false);
     } catch (error) {
-      setNotificationError(error.friendlyMessage ?? 'This notification could not be marked as read.');
+      setNotificationError(
+        error.friendlyMessage ?? 'This notification could not be marked as read.'
+      );
     } finally {
       setReadingNotificationIds((current) => {
         const next = new Set(current);
@@ -217,10 +229,12 @@ export default function TopNavBar() {
     try {
       await notificationApi.markAllRead();
       notificationCountVersion.current += 1;
-      setNotifications((current) => current.map((item) => ({
-        ...item,
-        readAt: item.readAt ?? new Date().toISOString(),
-      })));
+      setNotifications((current) =>
+        current.map((item) => ({
+          ...item,
+          readAt: item.readAt ?? new Date().toISOString(),
+        }))
+      );
       setUnreadCount(0);
       setNotificationError('');
       setNotificationOpen(false);
@@ -237,7 +251,7 @@ export default function TopNavBar() {
   }, [mobileOpen]);
 
   /* The active pill is the route indicator. NavLink resolves `isActive` from the current
-     location, and `end` keeps "/" from matching every path below it. */
+ location, and `end` keeps "/" from matching every path below it. */
   const deskLink = ({ isActive }) =>
     `relative rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
       isActive
@@ -247,22 +261,24 @@ export default function TopNavBar() {
 
   const sheetLink = ({ isActive }) =>
     `flex items-start gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
-      isActive ? 'bg-white text-brand-800' : 'text-brand-100 hover:bg-white/10 hover:text-white'
+      isActive ? 'bg-white text-brand-800 ' : 'text-brand-100 hover:bg-white/10 hover:text-white'
     }`;
 
   return (
     <header className="sticky top-0 z-40 bg-brand-800 shadow-sm">
       <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
-    
         <Link to="/" className="flex min-w-0 items-center gap-3">
           <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/15 text-white">
             <School className="size-5" aria-hidden="true" />
           </span>
           <span className="min-w-0">
-            <span className="block truncate text-sm font-bold text-white sm:text-base" title={schoolName}>
+            <span
+              className="block truncate text-sm font-bold text-white sm:text-base"
+              title={schoolName}
+            >
               {schoolName}
             </span>
-            <span className="block truncate text-xs text-brand-200">
+            <span className="block truncate text-xs text-brand-200 ">
               Nursery – Grade 12{academicYear ? ` · ${academicYear}` : ''}
             </span>
           </span>
@@ -277,8 +293,6 @@ export default function TopNavBar() {
             </NavLink>
           ))}
         </nav>
-
-
 
         <div className="ml-auto flex items-center gap-2">
           {isAuthenticated && unreadCount > 0 && (
@@ -310,44 +324,64 @@ export default function TopNavBar() {
                     <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
                       <div>
                         <h2 className="font-semibold">Notifications</h2>
-                        <p className="text-xs text-slate-500">{unreadCount} unread</p>
+                        <p className="text-xs text-slate-500 ">{unreadCount} unread</p>
                       </div>
                       <button
                         type="button"
                         onClick={markAllNotificationsRead}
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700 hover:text-brand-900"
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700 hover:text-brand-900 "
                       >
                         <CheckCheck className="size-4" aria-hidden="true" />
                         Mark all as read
                       </button>
                     </div>
                     {notificationError && (
-                      <p role="alert" className="border-b border-rose-100 bg-rose-50 px-4 py-2 text-xs text-rose-700">
+                      <p
+                        role="alert"
+                        className="border-b border-rose-100 bg-rose-50 px-4 py-2 text-xs text-rose-700 "
+                      >
                         {notificationError}
                       </p>
                     )}
                     <div className="max-h-96 overflow-y-auto">
                       {notificationBusy ? (
-                        <p className="px-4 py-8 text-center text-sm text-slate-500">Loading notifications…</p>
-                      ) : notifications.length ? notifications.map((notification) => (
-                        <button
-                          key={notification.id}
-                          type="button"
-                          onClick={() => markNotificationRead(notification)}
-                          disabled={readingNotificationIds.has(notification.id)}
-                          className={`block w-full border-b border-slate-100 px-4 py-3 text-left last:border-0 hover:bg-slate-50 disabled:opacity-60 ${notification.readAt ? 'bg-white' : 'bg-sky-50/70'}`}
-                        >
-                          <span className="flex items-start gap-2">
-                            {!notification.readAt && <span className="mt-1.5 size-2 shrink-0 rounded-full bg-sky-600" aria-hidden="true" />}
-                            <span className="min-w-0 flex-1">
-                              <span className="block text-sm font-semibold">{notification.title}</span>
-                              <span className="mt-0.5 block text-xs text-slate-600">{notification.message}</span>
-                              <span className="mt-1 block text-[11px] text-slate-400">{new Date(notification.createdAt).toLocaleString()}</span>
+                        <p className="px-4 py-8 text-center text-sm text-slate-500 ">
+                          Loading notifications…
+                        </p>
+                      ) : notifications.length ? (
+                        notifications.map((notification) => (
+                          <button
+                            key={notification.id}
+                            type="button"
+                            onClick={() => markNotificationRead(notification)}
+                            disabled={readingNotificationIds.has(notification.id)}
+                            className={`block w-full border-b border-slate-100 px-4 py-3 text-left last:border-0 hover:bg-slate-50 disabled:opacity-60 ${notification.readAt ? 'bg-white ' : 'bg-sky-50/70'}`}
+                          >
+                            <span className="flex items-start gap-2">
+                              {!notification.readAt && (
+                                <span
+                                  className="mt-1.5 size-2 shrink-0 rounded-full bg-sky-600 "
+                                  aria-hidden="true"
+                                />
+                              )}
+                              <span className="min-w-0 flex-1">
+                                <span className="block text-sm font-semibold">
+                                  {notification.title}
+                                </span>
+                                <span className="mt-0.5 block text-xs text-slate-600 ">
+                                  {notification.message}
+                                </span>
+                                <span className="mt-1 block text-[11px] text-slate-400 ">
+                                  {new Date(notification.createdAt).toLocaleString()}
+                                </span>
+                              </span>
                             </span>
-                          </span>
-                        </button>
-                      )) : (
-                        <p className="px-4 py-8 text-center text-sm text-slate-500">No recent notifications.</p>
+                          </button>
+                        ))
+                      ) : (
+                        <p className="px-4 py-8 text-center text-sm text-slate-500 ">
+                          No recent notifications.
+                        </p>
                       )}
                     </div>
                   </motion.section>
@@ -369,14 +403,14 @@ export default function TopNavBar() {
               </div>
 
               {/* A student's bar carries a standalone Logout button rather than a menu, so
-                  signing out is one tap with no discovery needed. */}
+ signing out is one tap with no discovery needed. */}
               {isStudent ? (
                 <>
                   <span className="grid size-10 shrink-0 place-items-center rounded-full bg-white/15 text-sm font-bold text-white">
                     {initialsOf(user?.fullName)}
                   </span>
                   {/* Always visible, at every width: on a narrow screen it drops to the icon
-                      rather than hiding behind the menu. */}
+ rather than hiding behind the menu. */}
                   <button
                     type="button"
                     onClick={() => logout({ silent: false })}
@@ -417,19 +451,19 @@ export default function TopNavBar() {
                         className="absolute right-0 mt-2 w-64 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
                       >
                         <div className="border-b border-slate-100 px-4 py-3">
-                          <p className="truncate font-semibold text-slate-900">{user?.fullName}</p>
-                          <p className="truncate text-xs text-slate-500">{user?.email}</p>
+                          <p className="truncate font-semibold text-slate-900 ">{user?.fullName}</p>
+                          <p className="truncate text-xs text-slate-500 ">{user?.email}</p>
                           <div className="mt-2 flex flex-wrap gap-1">
                             {roles.map((role) => (
                               <span
                                 key={role}
-                                className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700"
+                                className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 "
                               >
                                 {role}
                               </span>
                             ))}
                             {user?.employeeId && (
-                              <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[11px] text-slate-600">
+                              <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[11px] text-slate-600 ">
                                 {user.employeeId}
                               </span>
                             )}
@@ -443,7 +477,7 @@ export default function TopNavBar() {
                             setMenuOpen(false);
                             logout({ silent: false });
                           }}
-                          className="flex w-full items-center gap-2 px-4 py-3 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-50"
+                          className="flex w-full items-center gap-2 px-4 py-3 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-50 "
                         >
                           <LogOut className="size-4" aria-hidden="true" />
                           Logout
@@ -481,7 +515,7 @@ export default function TopNavBar() {
       </div>
 
       {/* Mobile sheet. Collapses in place instead of covering the page, so the content behind
-          it stays visible while choosing. */}
+ it stays visible while choosing. */}
       <AnimatePresence>
         {mobileOpen && (
           <motion.div
@@ -514,7 +548,9 @@ export default function TopNavBar() {
                       <Icon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                       <span className="min-w-0">
                         <span className="block font-semibold">{label}</span>
-                        {description && <span className="block text-xs opacity-80">{description}</span>}
+                        {description && (
+                          <span className="block text-xs opacity-80">{description}</span>
+                        )}
                       </span>
                     </NavLink>
                   </li>

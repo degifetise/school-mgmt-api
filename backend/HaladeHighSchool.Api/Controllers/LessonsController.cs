@@ -197,7 +197,12 @@ public class LessonsController : PortalControllerBase
         UpdateLessonRequest request,
         CancellationToken cancellationToken)
     {
-        var lesson = await _db.Lessons.FirstOrDefaultAsync(l => l.Id == id, cancellationToken);
+        var lesson = await _db.Lessons.FirstOrDefaultAsync(l =>
+            l.Id == id
+            && l.Teacher != null
+            && l.Teacher.User != null
+            && l.Teacher.User.SchoolId == CurrentSchoolId,
+            cancellationToken);
 
         if (lesson is null)
         {
@@ -214,6 +219,11 @@ public class LessonsController : PortalControllerBase
         {
             ModelState.AddModelError(nameof(request.SectionId), "Unknown or inactive section.");
             return ValidationProblem(ModelState);
+        }
+
+        if (await AuthoriseWriteAsync(lesson.SubjectId, request.SectionId, cancellationToken) is { } destinationDenial)
+        {
+            return destinationDenial;
         }
 
         lesson.Title = request.Title.Trim();
@@ -237,7 +247,12 @@ public class LessonsController : PortalControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteLesson(int id, CancellationToken cancellationToken)
     {
-        var lesson = await _db.Lessons.FirstOrDefaultAsync(l => l.Id == id, cancellationToken);
+        var lesson = await _db.Lessons.FirstOrDefaultAsync(l =>
+            l.Id == id
+            && l.Teacher != null
+            && l.Teacher.User != null
+            && l.Teacher.User.SchoolId == CurrentSchoolId,
+            cancellationToken);
 
         if (lesson is null)
         {
@@ -279,7 +294,12 @@ public class LessonsController : PortalControllerBase
         IFormFile file,
         CancellationToken cancellationToken)
     {
-        var lesson = await _db.Lessons.FirstOrDefaultAsync(l => l.Id == id, cancellationToken);
+        var lesson = await _db.Lessons.FirstOrDefaultAsync(l =>
+            l.Id == id
+            && l.Teacher != null
+            && l.Teacher.User != null
+            && l.Teacher.User.SchoolId == CurrentSchoolId,
+            cancellationToken);
 
         if (lesson is null)
         {
@@ -387,7 +407,12 @@ public class LessonsController : PortalControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteFile(int id, CancellationToken cancellationToken)
     {
-        var lesson = await _db.Lessons.FirstOrDefaultAsync(l => l.Id == id, cancellationToken);
+        var lesson = await _db.Lessons.FirstOrDefaultAsync(l =>
+            l.Id == id
+            && l.Teacher != null
+            && l.Teacher.User != null
+            && l.Teacher.User.SchoolId == CurrentSchoolId,
+            cancellationToken);
 
         if (lesson is null)
         {
@@ -426,6 +451,21 @@ public class LessonsController : PortalControllerBase
         int? sectionId,
         CancellationToken cancellationToken)
     {
+        var subjectConfigured = await _db.Subjects.AnyAsync(subject =>
+            subject.Id == subjectId
+            && subject.IsActive
+            && _db.SchoolGradeSections.Any(link =>
+                link.SchoolId == CurrentSchoolId
+                && link.GradeLevelId == subject.GradeLevelId
+                && (sectionId == null || link.SectionId == sectionId)
+                && link.GradeLevel!.IsActive
+                && link.Section!.IsActive),
+            cancellationToken);
+        if (!subjectConfigured)
+        {
+            return NotFoundProblem("The lesson subject or section is not configured for this school.");
+        }
+
         if (User.IsAdmin())
         {
             return null;
@@ -435,6 +475,15 @@ public class LessonsController : PortalControllerBase
         if (teacherId is null)
         {
             return ForbiddenProblem("Your account is not linked to a teacher profile.");
+        }
+
+        if (!await _db.Teachers.AnyAsync(teacher =>
+                teacher.Id == teacherId.Value
+                && teacher.User != null
+                && teacher.User.SchoolId == CurrentSchoolId,
+                cancellationToken))
+        {
+            return ForbiddenProblem("Your teacher profile does not belong to this school.");
         }
 
         return await _assignments.IsAssignedAsync(teacherId.Value, subjectId, sectionId, cancellationToken)
@@ -486,13 +535,26 @@ public class LessonsController : PortalControllerBase
     {
         if (User.GetTeacherId() is int teacherId)
         {
-            return teacherId;
+            return await _db.Teachers.AnyAsync(teacher =>
+                    teacher.Id == teacherId
+                    && teacher.User != null
+                    && teacher.User.SchoolId == CurrentSchoolId,
+                    cancellationToken)
+                ? teacherId
+                : null;
         }
 
         return await _db.TeacherSubjects
             .AsNoTracking()
             .Where(ts => ts.SubjectId == subjectId && ts.IsActive &&
-                         (sectionId == null || ts.SectionId == sectionId))
+                         (sectionId == null || ts.SectionId == sectionId)
+                         && ts.Teacher != null
+                         && ts.Teacher.User != null
+                         && ts.Teacher.User.SchoolId == CurrentSchoolId
+                         && _db.SchoolGradeSections.Any(link =>
+                             link.SchoolId == CurrentSchoolId
+                             && link.GradeLevelId == ts.Subject!.GradeLevelId
+                             && link.SectionId == ts.SectionId))
             .Select(ts => (int?)ts.TeacherId)
             .FirstOrDefaultAsync(cancellationToken);
     }
