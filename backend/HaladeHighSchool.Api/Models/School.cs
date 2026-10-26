@@ -26,6 +26,10 @@ public sealed class School
 
     public string PrimaryColor { get; set; } = "#1e3a8a";
 
+    public string? LogoUrl { get; set; }
+
+    public bool AllowPublicRegistration { get; set; }
+
     public string AcademicYear { get; set; } =
         $"{DateTime.UtcNow.Year}-{DateTime.UtcNow.Year + 1}";
 

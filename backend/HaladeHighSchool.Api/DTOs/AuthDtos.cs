@@ -54,19 +54,32 @@ public record UserProfileResponse
 /// </summary>
 public record RegisterStudentRequest
 {
+    private string _fullName = string.Empty;
+    private string _email = string.Empty;
+
     [Required]
     [RegularExpression("^(Student|Teacher)$", ErrorMessage = "RequestedRole must be Student or Teacher.")]
     public string RequestedRole { get; init; } = "Student";
 
     [Required(ErrorMessage = "Tell us your full name.")]
     [MaxLength(150)]
-    public string FullName { get; init; } = string.Empty;
+    [JsonPropertyName("fullName")]
+    public string FullName
+    {
+        get => _fullName;
+        init => _fullName = value?.Trim() ?? string.Empty;
+    }
 
     /// <summary>The applicant's own address. The issued credentials are sent here.</summary>
     [Required(ErrorMessage = "An email address is required so the school can reach you.")]
     [EmailAddress(ErrorMessage = "That does not look like an email address.")]
     [MaxLength(256)]
-    public string Email { get; init; } = string.Empty;
+    [JsonPropertyName("email")]
+    public string Email
+    {
+        get => _email;
+        init => _email = value?.Trim() ?? string.Empty;
+    }
 
     [Range(1, int.MaxValue, ErrorMessage = "Choose a grade.")]
     public int? GradeLevelId { get; init; }

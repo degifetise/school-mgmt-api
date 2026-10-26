@@ -52,7 +52,7 @@ const FIELDS = [
     name: 'contactPhone',
     label: 'Contact phone',
     type: 'tel',
-    placeholder: '+1 555 0100',
+    placeholder: '+251-92427-5434',
     required: true,
   },
   {

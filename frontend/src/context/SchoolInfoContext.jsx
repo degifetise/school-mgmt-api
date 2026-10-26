@@ -15,6 +15,8 @@ const FALLBACK = {
   contactEmail: null,
   academicYear: '',
   allowSelfRegistration: false,
+  allowPublicRegistration: false,
+  logoUrl: null,
   heroSubtitle: 'Nursery through Grade 12, one portal.',
   heroDescription: 'Lessons, weighted assessments and report cards in one place.',
   primaryColor: '#1e3a8a',

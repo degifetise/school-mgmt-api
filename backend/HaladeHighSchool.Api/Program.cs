@@ -228,6 +228,7 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 builder.Services.AddScoped<IEventService, EventService>();
 builder.Services.AddSingleton<IEventImageStorage, EventImageStorage>();
+builder.Services.AddSingleton<ISchoolLogoStorage, SchoolLogoStorage>();
 builder.Services.AddSingleton<ILessonFileStorage, LessonFileStorage>();
 
 builder.Services.AddFluentValidationAutoValidation();
@@ -237,6 +238,7 @@ builder.Services
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
     });
 
 builder.Services.AddAutoMapper(_ => { }, typeof(Program).Assembly);

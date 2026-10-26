@@ -1103,6 +1103,9 @@ namespace HaladeHighSchool.Api.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<bool>("AllowPublicRegistration")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -1124,15 +1127,15 @@ namespace HaladeHighSchool.Api.Migrations
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<string>("HeroDescription")
-                        .ValueGeneratedOnAdd()
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)")
                         .HasDefaultValue("Lessons, weighted assessments and report cards in one place.");
 
                     b.Property<string>("HeroSubtitle")
-                        .ValueGeneratedOnAdd()
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasDefaultValue("Nursery through Grade 12, one portal.");
@@ -1142,14 +1145,17 @@ namespace HaladeHighSchool.Api.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(true);
 
+                    b.Property<string>("LogoUrl")
+                        .HasColumnType("text");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
                     b.Property<string>("PrimaryColor")
-                        .ValueGeneratedOnAdd()
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasMaxLength(7)
                         .HasColumnType("character varying(7)")
                         .HasDefaultValue("#1e3a8a");

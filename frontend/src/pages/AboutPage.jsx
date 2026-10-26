@@ -2,9 +2,11 @@ import { useCallback } from 'react';
 import { BookOpen, Layers, Mail, ScrollText, Users } from 'lucide-react';
 import { publicApi } from '../services/endpoints';
 import { useApiResource } from '../hooks/useApiResource';
+import { useSchoolInfo } from '../context/SchoolInfoContext';
 import { ErrorState, Skeleton } from '../components/ui/Feedback';
 
 export default function AboutPage() {
+  const { allowSelfRegistration, allowPublicRegistration } = useSchoolInfo();
   const fetchOverview = useCallback(() => publicApi.overview(), []);
   const { data, error, loading, reload, reloading } = useApiResource(fetchOverview);
 
@@ -151,7 +153,7 @@ export default function AboutPage() {
               <dd className="text-slate-900">
                 {loading ? (
                   <Skeleton className="h-4 w-56" />
-                ) : data.allowSelfRegistration ? (
+                ) : allowSelfRegistration && allowPublicRegistration ? (
                   'Students may register themselves. Staff accounts are created by an administrator.'
                 ) : (
                   'Accounts are created by the school administrator. Contact the office if you cannot sign in.'

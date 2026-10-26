@@ -12,7 +12,14 @@ import StudentRegistrationForm from '../components/auth/StudentRegistrationForm'
 
 export default function LoginPage() {
   const { login, isAuthenticated, roles, initialising, sessionMessage, clearSessionMessage } = useAuth();
-  const { schoolName, contactEmail, academicYear, allowSelfRegistration } = useSchoolInfo();
+  const {
+    schoolName,
+    contactEmail,
+    academicYear,
+    allowSelfRegistration,
+    allowPublicRegistration,
+  } = useSchoolInfo();
+  const registrationOpen = allowSelfRegistration && allowPublicRegistration;
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -253,7 +260,7 @@ export default function LoginPage() {
             </form>
             )}
 
-            {allowSelfRegistration && (
+            {registrationOpen && (
               <button
                 type="button"
                 onClick={() => {
@@ -267,7 +274,7 @@ export default function LoginPage() {
             )}
 
             <p className="mt-6 text-center text-xs text-slate-500">
-              {allowSelfRegistration
+              {registrationOpen
                 ? 'An administrator reviews each registration and issues your credentials; staff accounts are created for you.'
                 : 'Accounts are created by the school administrator.'}
               {contactEmail && (
