@@ -76,7 +76,8 @@ public sealed class PublicSchoolRegistrationController : PortalControllerBase
         return Ok(new PublicSchoolRegistrationResponse(
             school.Name,
             school.Slug,
-            await _settings.IsSelfRegistrationAllowedAsync(cancellationToken),
+            school.AllowPublicRegistration &&
+                await _settings.IsSelfRegistrationAllowedAsync(cancellationToken),
             grades));
     }
 
@@ -92,6 +93,20 @@ public sealed class PublicSchoolRegistrationController : PortalControllerBase
         RegisterStudentRequest request,
         CancellationToken cancellationToken)
     {
+        var schoolId = await _db.Schools.AsNoTracking()
+            .Where(item => item.Slug == slug.ToLowerInvariant() && item.IsActive)
+            .Select(item => new { item.Id, item.AllowPublicRegistration })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (schoolId is null)
+        {
+            return NotFoundProblem("This school registration page could not be found.");
+        }
+
+        if (!schoolId.AllowPublicRegistration)
+        {
+            return PublicRegistrationClosed();
+        }
+
         if (request.RequestedRole != "Student")
         {
             return BadRequestProblem("Student registration only", "Only student applications are accepted on this route.");
@@ -107,16 +122,7 @@ public sealed class PublicSchoolRegistrationController : PortalControllerBase
             });
         }
 
-        var schoolId = await _db.Schools.AsNoTracking()
-            .Where(item => item.Slug == slug.ToLowerInvariant() && item.IsActive)
-            .Select(item => (Guid?)item.Id)
-            .SingleOrDefaultAsync(cancellationToken);
-        if (schoolId is null)
-        {
-            return NotFoundProblem("This school registration page could not be found.");
-        }
-
-        var result = await _registrations.SubmitAsync(request, cancellationToken, schoolId);
+        var result = await _registrations.SubmitAsync(request, cancellationToken, schoolId.Id);
         if (result.Succeeded && result.Value is { } submitted)
         {
             return Accepted(new RegistrationSubmittedResponse
@@ -150,4 +156,12 @@ public sealed class PublicSchoolRegistrationController : PortalControllerBase
             })
         };
     }
+
+    private ObjectResult PublicRegistrationClosed() =>
+        StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
+        {
+            Title = "Registration closed",
+            Detail = "Public registration is currently closed for this school.",
+            Status = StatusCodes.Status403Forbidden
+        });
 }

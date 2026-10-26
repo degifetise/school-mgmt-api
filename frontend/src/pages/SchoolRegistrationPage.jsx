@@ -48,14 +48,25 @@ export default function SchoolRegistrationPage() {
   async function submit(event) {
     event.preventDefault();
     setError('');
+
+    const fullName = form.fullName.trim();
+    const email = form.email.trim();
+    const gradeLevelId = Number(form.gradeLevelId);
+    const sectionId = Number(form.sectionId);
+    if (!fullName || !email || !Number.isInteger(gradeLevelId) || gradeLevelId < 1
+        || !Number.isInteger(sectionId) || sectionId < 1) {
+      setError('Enter your name and email, then choose a grade and section.');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const result = await schoolApi.registerBySlug(schoolSlug, {
         requestedRole: 'Student',
-        fullName: form.fullName.trim(),
-        email: form.email.trim(),
-        gradeLevelId: Number(form.gradeLevelId),
-        sectionId: Number(form.sectionId),
+        fullName,
+        email,
+        gradeLevelId,
+        sectionId,
       });
       setReceipt(result.message ?? 'Your application has been submitted for review.');
     } catch (submitError) {

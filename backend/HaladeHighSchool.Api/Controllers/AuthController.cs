@@ -174,6 +174,21 @@ public class AuthController : ControllerBase
         RegisterStudentRequest request,
         CancellationToken cancellationToken)
     {
+        var schoolRegistrationAllowed = await _db.Schools
+            .AsNoTracking()
+            .Where(school => school.Id == School.DefaultSchoolId)
+            .Select(school => (bool?)school.AllowPublicRegistration)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (schoolRegistrationAllowed == false)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
+            {
+                Title = "Registration closed",
+                Detail = "Public registration is currently closed for this school.",
+                Status = StatusCodes.Status403Forbidden
+            });
+        }
+
         if (!await _settings.IsSelfRegistrationAllowedAsync(cancellationToken))
         {
             return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails

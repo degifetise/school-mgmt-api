@@ -90,6 +90,11 @@ export const schoolApi = {
   getBrandingSettings: () => unwrap(api.get('/api/systemsettings/school-settings')),
   updateBrandingSettings: (payload) =>
     unwrap(api.put('/api/systemsettings/school-settings', payload)),
+  uploadLogo: (file) => {
+    const formData = new FormData();
+    formData.append('logo', file);
+    return unwrap(api.post('/api/systemsettings/school-settings/logo', formData));
+  },
   getRegistrationInfo: (slug) =>
     unwrap(api.get(`/api/public/schools/slug/${encodeURIComponent(slug)}`)),
   registerBySlug: (slug, payload) =>

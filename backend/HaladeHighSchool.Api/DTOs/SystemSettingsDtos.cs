@@ -15,14 +15,17 @@ public static class SystemSettingsLimits
 /// <summary>
 /// The subset of settings safe to serve without authentication, so the login screen and the
 /// dashboard header can render the school's identity before anybody has signed in.
-/// AllowSelfRegistration is included so the login page knows whether to offer a sign-up link.
+/// Registration switches and the logo are included so public pages and the dashboard can
+/// render the school's branding and registration state.
 /// </summary>
 public record SchoolInfoResponse
 {
     public string SchoolName { get; init; } = string.Empty;
     public string? ContactEmail { get; init; }
+    public string? LogoUrl { get; init; }
     public string AcademicYear { get; init; } = string.Empty;
     public bool AllowSelfRegistration { get; init; }
+    public bool AllowPublicRegistration { get; init; }
     public string HeroSubtitle { get; init; } = string.Empty;
     public string HeroDescription { get; init; } = string.Empty;
     public string PrimaryColor { get; init; } = "#1e3a8a";
@@ -33,9 +36,11 @@ public sealed record SchoolBrandingSettingsResponse(
     string HeroSubtitle,
     string HeroDescription,
     string PrimaryColor,
-    string AcademicYear);
+    string AcademicYear,
+    string? LogoUrl,
+    bool AllowPublicRegistration);
 
-/// <summary>Updates branding and academic-year settings for the authenticated user's school.</summary>
+/// <summary>Updates branding and registration settings for the authenticated user's school.</summary>
 public sealed record UpdateSchoolBrandingSettingsRequest : IValidatableObject
 {
     [Required, MaxLength(200)]
@@ -49,6 +54,11 @@ public sealed record UpdateSchoolBrandingSettingsRequest : IValidatableObject
 
     [Required, RegularExpression("^[0-9]{4}-[0-9]{4}$")]
     public required string AcademicYear { get; init; }
+
+    [MaxLength(300)]
+    public string? LogoUrl { get; init; }
+
+    public bool AllowPublicRegistration { get; init; }
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {

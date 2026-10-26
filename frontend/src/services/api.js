@@ -20,6 +20,121 @@ if (configuredBaseUrl) {
 }
 export const API_BASE_URL = BASE_URL;
 
+const MAX_API_RETRIES = 3;
+const API_RETRY_DELAY_MS = 3000;
+const RETRYABLE_NETWORK_CODES = new Set([
+  'ECONNABORTED',
+  'ETIMEDOUT',
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'EHOSTUNREACH',
+  'ENETUNREACH',
+  'EAI_AGAIN',
+  'ERR_NETWORK',
+]);
+let apiRetryState = { activeRequests: 0, attempt: 0 };
+const apiRetryListeners = new Set();
+
+function publishApiRetryState(nextState) {
+  apiRetryState = nextState;
+  apiRetryListeners.forEach((listener) => listener());
+}
+
+export function subscribeApiRetryState(listener) {
+  apiRetryListeners.add(listener);
+  return () => apiRetryListeners.delete(listener);
+}
+
+export function getApiRetryState() {
+  return apiRetryState;
+}
+
+function beginApiRetry(config, attempt) {
+  if (!config.__retryActive) {
+    config.__retryActive = true;
+    publishApiRetryState({
+      activeRequests: apiRetryState.activeRequests + 1,
+      attempt: Math.max(apiRetryState.attempt, attempt),
+    });
+    return;
+  }
+
+  publishApiRetryState({
+    ...apiRetryState,
+    attempt: Math.max(apiRetryState.attempt, attempt),
+  });
+}
+
+function finishApiRetry(config) {
+  if (!config?.__retryActive) return;
+
+  config.__retryActive = false;
+  const activeRequests = Math.max(0, apiRetryState.activeRequests - 1);
+  publishApiRetryState({
+    activeRequests,
+    attempt: activeRequests === 0 ? 0 : apiRetryState.attempt,
+  });
+}
+
+function isRetryableNetworkFailure(error) {
+  if (axios.isCancel(error) || error?.code === 'ERR_CANCELED') return false;
+  if (error?.response) {
+    return error.response.status === 503 || error.response.status === 504;
+  }
+  return Boolean(error?.request) || RETRYABLE_NETWORK_CODES.has(error?.code);
+}
+
+function waitBeforeRetry(milliseconds, signal) {
+  if (signal?.aborted) {
+    return Promise.reject(new axios.CanceledError('Request canceled.'));
+  }
+
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timeout);
+      reject(new axios.CanceledError('Request canceled.'));
+    };
+    const timeout = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, milliseconds);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+function addRetryInterceptor(client) {
+  client.interceptors.response.use(
+    (response) => {
+      finishApiRetry(response.config);
+      return response;
+    },
+    async (error) => {
+      const config = error?.config;
+      if (!config) return Promise.reject(error);
+
+      const retryCount = config.__retryCount ?? 0;
+      if (!isRetryableNetworkFailure(error) || retryCount >= MAX_API_RETRIES) {
+        finishApiRetry(config);
+        return Promise.reject(error);
+      }
+
+      const nextAttempt = retryCount + 1;
+      config.__retryCount = nextAttempt;
+      beginApiRetry(config, nextAttempt);
+
+      try {
+        await waitBeforeRetry(API_RETRY_DELAY_MS * nextAttempt, config.signal);
+        return await client.request(config);
+      } catch (retryError) {
+        if (axios.isCancel(retryError) || retryError?.code === 'ERR_CANCELED') {
+          finishApiRetry(config);
+        }
+        throw retryError;
+      }
+    },
+  );
+}
+
 export const STORAGE_KEYS = {
   accessToken: 'halade.accessToken',
   refreshToken: 'halade.refreshToken',
@@ -90,6 +205,9 @@ const api = axios.create({
 
 /** Bare client for refreshing, so the interceptors below cannot recurse. */
 const refreshClient = axios.create({ baseURL: BASE_URL, withCredentials: true, timeout: 30000 });
+
+addRetryInterceptor(api);
+addRetryInterceptor(refreshClient);
 
 api.interceptors.request.use((config) => {
   const token = tokenStore.getAccessToken();

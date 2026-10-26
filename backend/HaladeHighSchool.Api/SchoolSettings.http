@@ -1,0 +1,32 @@
+@baseUrl = http://localhost:5006
+@accessToken = replace-with-school-admin-access-token
+
+### Get branding and public registration settings for the signed-in school
+GET {{baseUrl}}/api/systemsettings/school-settings
+Authorization: Bearer {{accessToken}}
+
+### Update branding and public registration settings
+PUT {{baseUrl}}/api/systemsettings/school-settings
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "heroSubtitle": "Nursery through Grade 12, one portal.",
+  "heroDescription": "Lessons, weighted assessments and report cards in one place.",
+  "primaryColor": "#1E3A8A",
+  "academicYear": "2026-2027",
+  "logoUrl": null,
+  "allowPublicRegistration": false
+}
+
+### Upload a JPEG, PNG or WebP school logo (maximum 2 MB)
+POST {{baseUrl}}/api/systemsettings/school-settings/logo
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=SchoolLogoBoundary
+
+--SchoolLogoBoundary
+Content-Disposition: form-data; name="logo"; filename="school-logo.png"
+Content-Type: image/png
+
+< ./school-logo.png
+--SchoolLogoBoundary--

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Save, Settings } from 'lucide-react';
+import { ImagePlus, Save, Settings, Trash2 } from 'lucide-react';
 import { schoolApi, systemSettingsApi } from '../../services/endpoints';
-import { extractErrorMessage } from '../../services/api';
+import { API_BASE_URL, extractErrorMessage } from '../../services/api';
 import { useSchoolInfo } from '../../context/SchoolInfoContext';
 import { useAuth } from '../../context/AuthContext';
 import { Alert, ErrorState, LoadingPanel, Spinner } from '../../components/ui/Feedback';
@@ -19,6 +19,7 @@ export default function AdminSettings() {
   const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
 
@@ -39,6 +40,8 @@ export default function AdminSettings() {
         heroSubtitle: branding?.heroSubtitle ?? '',
         heroDescription: branding?.heroDescription ?? '',
         primaryColor: branding?.primaryColor ?? '#1e3a8a',
+        logoUrl: branding?.logoUrl ?? null,
+        allowPublicRegistration: Boolean(branding?.allowPublicRegistration),
         passMarkPercentage: data?.passMarkPercentage ?? 50,
         maxUploadSizeMb: data?.maxUploadSizeMb ?? 25,
         allowSelfRegistration: Boolean(data?.allowSelfRegistration),
@@ -60,6 +63,26 @@ export default function AdminSettings() {
     const value = event.target.type === 'checkbox' ? event.target.checked : event.target.value;
     setForm((prev) => ({ ...prev, [key]: value }));
   };
+
+  async function uploadLogo(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    setLogoUploading(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const saved = await schoolApi.uploadLogo(file);
+      setForm((previous) => ({ ...previous, logoUrl: saved.logoUrl }));
+      await refreshSchoolInfo();
+      setNotice('School logo uploaded and activated.');
+    } catch (err) {
+      setError(err.friendlyMessage ?? extractErrorMessage(err));
+    } finally {
+      setLogoUploading(false);
+    }
+  }
 
   async function submit(event) {
     event.preventDefault();
@@ -88,6 +111,8 @@ export default function AdminSettings() {
           heroDescription: form.heroDescription.trim(),
           primaryColor: form.primaryColor.trim(),
           academicYear: form.academicYear.trim(),
+          logoUrl: form.logoUrl,
+          allowPublicRegistration: form.allowPublicRegistration,
         });
       }
       await schoolApi.updateName(user.schoolId, form.schoolName.trim());
@@ -136,6 +161,50 @@ export default function AdminSettings() {
       <form onSubmit={submit} className="card space-y-5 p-6">
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="sm:col-span-2">
+            <label className="label" htmlFor="schoolLogo">
+              School logo
+            </label>
+            <div className="flex flex-wrap items-center gap-4">
+              {form.logoUrl ? (
+                <img
+                  src={new URL(form.logoUrl, API_BASE_URL).toString()}
+                  alt={`${form.schoolName} logo`}
+                  className="size-16 rounded-lg border border-slate-200 bg-white object-contain p-1"
+                />
+              ) : (
+                <div className="grid size-16 place-items-center rounded-lg border border-dashed border-slate-300 text-slate-400">
+                  <ImagePlus className="size-6" aria-hidden="true" />
+                </div>
+              )}
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  id="schoolLogo"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="input max-w-sm"
+                  onChange={uploadLogo}
+                  disabled={saving || logoUploading}
+                />
+                {form.logoUrl && (
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setForm((previous) => ({ ...previous, logoUrl: null }))}
+                    disabled={saving || logoUploading}
+                  >
+                    <Trash2 className="size-4" aria-hidden="true" />
+                    Remove logo
+                  </button>
+                )}
+                {logoUploading && <Spinner className="size-4" />}
+              </div>
+            </div>
+            <p className="mt-1.5 text-xs text-slate-500">
+              Upload a JPEG, PNG or WebP image up to 2 MB. The logo appears in the portal header.
+            </p>
+          </div>
+
+          <div className="sm:col-span-2">
             <label className="label" htmlFor="schoolName">
               School name
             </label>
@@ -151,6 +220,23 @@ export default function AdminSettings() {
               Shown in the portal header, the login screen and printed reports.
             </p>
           </div>
+
+          <label className="flex items-start gap-3 rounded-lg border border-slate-200 p-4">
+            <input
+              type="checkbox"
+              className="mt-0.5 size-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+              checked={form.allowPublicRegistration}
+              onChange={update('allowPublicRegistration')}
+            />
+            <span>
+              <span className="block text-sm font-medium text-slate-800">
+                Allow public student and teacher registration
+              </span>
+              <span className="block text-xs text-slate-500">
+                When off, public applications for this school are rejected with 403 Forbidden.
+              </span>
+            </span>
+          </label>
 
           <div>
             <label className="label" htmlFor="heroSubtitle">

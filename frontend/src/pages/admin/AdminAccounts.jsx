@@ -360,7 +360,7 @@ function RegistrationCard({ row, busy, onApprove, onReject }) {
  * figures and the student roster live on the Students page.
  */
 export default function AdminAccounts() {
-  const { allowSelfRegistration } = useSchoolInfo();
+  const { allowSelfRegistration, allowPublicRegistration } = useSchoolInfo();
 
   const [reviewTab, setReviewTab] = useState('Pending');
   const [registrations, setRegistrations] = useState([]);
@@ -551,9 +551,9 @@ export default function AdminAccounts() {
             ))}
           </div>
 
-          {!allowSelfRegistration && (
+          {(!allowSelfRegistration || !allowPublicRegistration) && (
             <p className="text-xs text-slate-500">
-              Self-registration is currently switched off in Settings, so no new applications will
+              Public registration is currently disabled in Settings, so no new applications will
               arrive.
             </p>
           )}

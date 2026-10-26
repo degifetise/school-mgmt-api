@@ -18,6 +18,7 @@ import {
 import { ROLES, useAuth } from '../../context/AuthContext';
 import { useSchoolInfo } from '../../context/SchoolInfoContext';
 import { notificationApi } from '../../services/endpoints';
+import { API_BASE_URL } from '../../services/api';
 import { navItemsFor } from './navigation';
 
 const ROLE_STYLE = {
@@ -80,7 +81,7 @@ function IdentityLine({ user, roles }) {
 
 export default function TopNavBar() {
   const { user, roles, isAuthenticated, logout } = useAuth();
-  const { schoolName, academicYear } = useSchoolInfo();
+  const { schoolName, academicYear, logoUrl } = useSchoolInfo();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -269,7 +270,15 @@ export default function TopNavBar() {
       <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
         <Link to="/" className="flex min-w-0 items-center gap-3">
           <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/15 text-white">
-            <School className="size-5" aria-hidden="true" />
+            {logoUrl ? (
+              <img
+                src={new URL(logoUrl, API_BASE_URL).toString()}
+                alt={`${schoolName} logo`}
+                className="size-10 rounded-xl object-contain"
+              />
+            ) : (
+              <School className="size-5" aria-hidden="true" />
+            )}
           </span>
           <span className="min-w-0">
             <span
