@@ -1,10 +1,10 @@
 import { useCallback, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Eye, EyeOff, LogIn, Mail, School } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, LogIn, Mail, School, X } from 'lucide-react';
 import { homeRouteFor, useAuth } from '../context/AuthContext';
 import { useSchoolInfo } from '../context/SchoolInfoContext';
-import { publicApi } from '../services/endpoints';
+import { authApi, publicApi } from '../services/endpoints';
 import { useApiResource } from '../hooks/useApiResource';
 import { extractErrorMessage } from '../services/api';
 import { Alert, Skeleton, Spinner } from '../components/ui/Feedback';
@@ -33,6 +33,11 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSubmitting, setForgotSubmitting] = useState(false);
+  const [forgotError, setForgotError] = useState('');
+  const [forgotNotice, setForgotNotice] = useState('');
 
   /* Registration lives here rather than in the navigation bar: it is the same errand as signing
      in, and a visitor who cannot get in is already on this screen. */
@@ -52,11 +57,32 @@ export default function LoginPage() {
     try {
       const profile = await login(email.trim(), password);
       clearSessionMessage();
-      navigate(location.state?.from?.pathname ?? homeRouteFor(profile.roles), { replace: true });
+      navigate(
+        profile.mustChangePasswordOnLogin
+          ? '/settings'
+          : location.state?.from?.pathname ?? homeRouteFor(profile.roles),
+        { replace: true },
+      );
     } catch (err) {
       setError(err.friendlyMessage ?? extractErrorMessage(err));
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function submitForgotPassword(event) {
+    event.preventDefault();
+    setForgotSubmitting(true);
+    setForgotError('');
+    setForgotNotice('');
+    try {
+      const result = await authApi.requestPasswordReset(forgotEmail.trim());
+      setForgotNotice(result?.message
+        ?? 'Your password reset request has been submitted to the school administration for approval. Once approved, a temporary password will be sent to your email.');
+    } catch (err) {
+      setForgotError(err.friendlyMessage ?? extractErrorMessage(err));
+    } finally {
+      setForgotSubmitting(false);
     }
   }
 
@@ -249,6 +275,19 @@ export default function LoginPage() {
                 </div>
               </div>
 
+              <button
+                type="button"
+                className="mb-4 text-sm font-semibold text-brand-700 hover:underline"
+                onClick={() => {
+                  setForgotEmail(email);
+                  setForgotError('');
+                  setForgotNotice('');
+                  setForgotOpen(true);
+                }}
+              >
+                Forgot Password?
+              </button>
+
               <button type="submit" className="btn-primary w-full" disabled={submitting}>
                 {submitting ? (
                   <Spinner className="size-4" />
@@ -293,6 +332,71 @@ export default function LoginPage() {
           </div>
         </motion.div>
       </div>
+      {forgotOpen && (
+        <div className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/60 p-4">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="forgot-password-title"
+            className="card w-full max-w-md p-6 shadow-xl"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 id="forgot-password-title" className="text-lg font-bold text-slate-900">
+                  Request a password reset
+                </h2>
+                <p className="mt-2 text-sm text-slate-600">
+                  Are you sure you want to request a password reset?
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn-secondary"
+                aria-label="Close password reset dialog"
+                onClick={() => setForgotOpen(false)}
+              >
+                <X className="size-4" aria-hidden="true" />
+              </button>
+            </div>
+
+            {forgotError && <Alert variant="error" title="Request failed" className="mt-4">{forgotError}</Alert>}
+            {forgotNotice && <Alert variant="success" className="mt-4">{forgotNotice}</Alert>}
+
+            <form onSubmit={submitForgotPassword} className="mt-5 space-y-4">
+              <label className="block">
+                <span className="label">Registered email address</span>
+                <input
+                  className="input"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  maxLength={256}
+                  value={forgotEmail}
+                  onChange={(event) => {
+                    setForgotEmail(event.target.value);
+                    setForgotNotice('');
+                  }}
+                  disabled={forgotSubmitting}
+                />
+              </label>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setForgotOpen(false)}
+                  disabled={forgotSubmitting}
+                >
+                  Close
+                </button>
+                <button type="submit" className="btn-primary" disabled={forgotSubmitting || Boolean(forgotNotice)}>
+                  {forgotSubmitting ? <Spinner className="size-4" /> : null}
+                  Submit request
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ClipboardList, Download, Search, Users } from 'lucide-react';
+import { ClipboardList, Download, Search, ShieldAlert, Users } from 'lucide-react';
 import { reportPdfApi, teacherApi } from '../../services/endpoints';
 import { extractErrorMessage } from '../../services/api';
 import { Alert, Badge, EmptyState, ErrorState, LoadingPanel, Spinner } from '../../components/ui/Feedback';
+import ConductManager from '../../components/conduct/ConductManager';
 
 const gradeTone = (letter) => {
   if (!letter) return 'slate';
@@ -65,6 +66,7 @@ export default function TeacherStudents() {
   const [classes, setClasses] = useState([]);
   const [assignmentId, setAssignmentId] = useState('');
   const [roster, setRoster] = useState(null);
+  const [conductStudent, setConductStudent] = useState(null);
   const [search, setSearch] = useState('');
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [downloadError, setDownloadError] = useState(null);
@@ -248,6 +250,9 @@ export default function TeacherStudents() {
               </button>
             </>
           )}
+          {conductStudent && (
+            <ConductManager student={conductStudent} onClose={() => setConductStudent(null)} />
+          )}
         </div>
       </section>
 
@@ -322,6 +327,9 @@ export default function TeacherStudents() {
                       <th scope="col" className="px-5 py-3 text-right font-semibold">
                         Grade
                       </th>
+                      <th scope="col" className="px-5 py-3 text-right font-semibold">
+                        Conduct
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -335,6 +343,21 @@ export default function TeacherStudents() {
                         <td className="px-5 py-3">
                           <p className="font-medium text-slate-900">{student.fullName}</p>
                           <p className="text-xs text-slate-500">{student.email ?? 'No login'}</p>
+                        </td>
+                        <td className="px-5 py-3 text-right">
+                          <button
+                            type="button"
+                            className="btn-secondary !px-2.5 !py-2"
+                            onClick={() => setConductStudent({
+                              id: student.studentId,
+                              fullName: student.fullName,
+                              studentIdNumber: student.studentIdNumber,
+                            })}
+                            aria-label={`View conduct for ${student.fullName}`}
+                            title="Student conduct"
+                          >
+                            <ShieldAlert className="size-4" aria-hidden="true" />
+                          </button>
                         </td>
                         <td className="px-5 py-3 font-mono text-xs text-slate-600">
                           {student.studentIdNumber}

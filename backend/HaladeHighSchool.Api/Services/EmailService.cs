@@ -1,17 +1,26 @@
 using System.Net;
-using MailKit.Net.Smtp;
-using MailKit.Security;
-using MimeKit;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json.Serialization;
+using HaladeHighSchool.Api.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace HaladeHighSchool.Api.Services;
 
 public sealed class EmailService : IEmailService
 {
-    private readonly IConfiguration _configuration;
+    private readonly HttpClient _httpClient;
+    private readonly ResendSettings _settings;
+    private readonly ILogger<EmailService> _logger;
 
-    public EmailService(IConfiguration configuration)
+    public EmailService(
+        HttpClient httpClient,
+        IOptions<ResendSettings> settings,
+        ILogger<EmailService> logger)
     {
-        _configuration = configuration;
+        _httpClient = httpClient;
+        _settings = settings.Value;
+        _logger = logger;
     }
 
     public Task SendStudentApprovalEmailAsync(
@@ -55,6 +64,27 @@ public sealed class EmailService : IEmailService
             "Sign in with these credentials and change your password after signing in.",
             cancellationToken);
 
+    public Task SendPasswordResetApprovedEmailAsync(
+        string toEmail,
+        string fullName,
+        string temporaryPassword,
+        string loginUrl,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(
+            toEmail,
+            "Your school password reset was approved",
+            $"<p>Hello {WebUtility.HtmlEncode(fullName)},</p>" +
+            "<p>Your password reset request has been approved.</p>" +
+            $"<p><strong>Temporary password:</strong> {WebUtility.HtmlEncode(temporaryPassword)}</p>" +
+            $"<p><a href=\"{WebUtility.HtmlEncode(loginUrl)}\">Sign in to your school account</a></p>" +
+            "<p>You will be asked to change this temporary password after signing in.</p>",
+            $"Hello {fullName},\n\n" +
+            "Your password reset request has been approved.\n\n" +
+            $"Temporary password: {temporaryPassword}\n" +
+            $"Sign in: {loginUrl}\n\n" +
+            "You will be asked to change this temporary password after signing in.",
+            cancellationToken);
+
     private async Task SendAsync(
         string toEmail,
         string subject,
@@ -62,46 +92,83 @@ public sealed class EmailService : IEmailService
         string textBody,
         CancellationToken cancellationToken)
     {
-        var smtpServer = GetRequiredSetting("EmailSettings:SmtpServer");
-        var senderEmail = GetRequiredSetting("EmailSettings:SenderEmail");
-        var senderName = GetRequiredSetting("EmailSettings:SenderName");
-        var password = GetRequiredSetting("EmailSettings:Password");
-
-        if (!int.TryParse(GetRequiredSetting("EmailSettings:Port"), out var port))
+        try
         {
-            throw new InvalidOperationException("Configuration key 'EmailSettings:Port' must be a valid port number.");
+            if (string.IsNullOrWhiteSpace(_settings.ApiKey))
+            {
+                throw new InvalidOperationException(
+                    "Resend is not configured. Set Resend:ApiKey or EmailSettings:ApiKey.");
+            }
+
+            if (string.IsNullOrWhiteSpace(_settings.FromAddress))
+            {
+                throw new InvalidOperationException(
+                    "The Resend sender address is not configured. Set EmailSettings:SenderEmail.");
+            }
+
+            if (string.IsNullOrWhiteSpace(toEmail))
+            {
+                throw new ArgumentException("A recipient email address is required.", nameof(toEmail));
+            }
+
+            var sender = string.IsNullOrWhiteSpace(_settings.FromName)
+                ? _settings.FromAddress.Trim()
+                : $"{_settings.FromName.Trim()} <{_settings.FromAddress.Trim()}>";
+            using var request = new HttpRequestMessage(HttpMethod.Post, "emails")
+            {
+                Headers =
+                {
+                    Authorization = new AuthenticationHeaderValue("Bearer", _settings.ApiKey)
+                },
+                Content = JsonContent.Create(new ResendEmailRequest(
+                    sender,
+                    toEmail.Trim(),
+                    subject,
+                    htmlBody,
+                    textBody))
+            };
+
+            using var response = await _httpClient.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                throw new HttpRequestException(
+                    $"Resend rejected email with status {(int)response.StatusCode} " +
+                    $"({response.StatusCode}): {responseBody}",
+                    inner: null,
+                    statusCode: response.StatusCode);
+            }
         }
-
-        if (string.IsNullOrWhiteSpace(toEmail))
+        catch (Exception exception) when (
+            exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
-            throw new ArgumentException("A recipient email address is required.", nameof(toEmail));
+            _logger.LogError(
+                exception,
+                "Resend email delivery failed for recipient {Recipient}. Error: {ErrorMessage}. " +
+                "Exception chain: {ExceptionDetails}",
+                MaskEmailAddress(toEmail ?? string.Empty),
+                exception.Message,
+                exception.ToString());
+
+            throw;
         }
-
-        var message = new MimeMessage();
-        message.From.Add(new MailboxAddress(senderName, senderEmail));
-        message.To.Add(MailboxAddress.Parse(toEmail.Trim()));
-        message.Subject = subject;
-        message.Body = new BodyBuilder
-        {
-            HtmlBody = htmlBody,
-            TextBody = textBody
-        }.ToMessageBody();
-
-        using var client = new SmtpClient();
-        await client.ConnectAsync(smtpServer, port, SecureSocketOptions.StartTls, cancellationToken);
-        await client.AuthenticateAsync(senderEmail, password, cancellationToken);
-        await client.SendAsync(message, cancellationToken);
-        await client.DisconnectAsync(true, cancellationToken);
     }
 
-    private string GetRequiredSetting(string key)
-    {
-        var value = _configuration[key];
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            throw new InvalidOperationException($"Required configuration key '{key}' is missing.");
-        }
+    private sealed record ResendEmailRequest(
+        [property: JsonPropertyName("from")] string From,
+        [property: JsonPropertyName("to")] string To,
+        [property: JsonPropertyName("subject")] string Subject,
+        [property: JsonPropertyName("html")] string Html,
+        [property: JsonPropertyName("text")] string Text);
 
-        return value;
+    private static string MaskEmailAddress(string email)
+    {
+        var atIndex = email.IndexOf('@');
+        return atIndex <= 1
+            ? "[redacted]"
+            : $"{email[0]}***{email[atIndex..]}";
     }
 }

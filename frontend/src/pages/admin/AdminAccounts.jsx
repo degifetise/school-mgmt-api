@@ -448,8 +448,13 @@ export default function AdminAccounts() {
     setError(null);
     try {
       if (approve) {
+        const result = await registrationApi.approve(row.id, note);
+        if (!result || result.requestId !== row.id || !result.temporaryPassword) {
+          throw new Error('The approval response was incomplete. Refresh the queue before retrying.');
+        }
+
         // Keep the one-time credentials visible to the administrator after the email is sent.
-        setIssued(await registrationApi.approve(row.id, note));
+        setIssued(result);
         setNotice(null);
       } else {
         await registrationApi.reject(row.id, note);
@@ -457,7 +462,12 @@ export default function AdminAccounts() {
       }
       await loadQueue();
     } catch (err) {
-      setError(err.friendlyMessage ?? extractErrorMessage(err));
+      setError(
+        err.response?.data?.message
+          ?? err.message
+          ?? err.friendlyMessage
+          ?? extractErrorMessage(err),
+      );
       if (approve) {
         await loadQueue();
       }

@@ -9,7 +9,7 @@ import { LoadingPanel } from '../components/ui/Feedback';
  * a dead end, because the only way to hit this is a hand-typed URL or a stale bookmark.
  */
 export default function ProtectedRoute({ allowedRoles }) {
-  const { isAuthenticated, initialising, roles } = useAuth();
+  const { isAuthenticated, initialising, roles, user } = useAuth();
   const location = useLocation();
 
   // Deciding before /api/auth/me resolves would bounce a valid session to the login screen.
@@ -24,6 +24,16 @@ export default function ProtectedRoute({ allowedRoles }) {
   if (!isAuthenticated) {
     // `state.from` lets the login screen return the user to where they were heading.
     return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
+  if (user?.mustChangePasswordOnLogin && location.pathname !== '/settings') {
+    return (
+      <Navigate
+        to="/settings"
+        replace
+        state={{ alert: 'For your account security, change the temporary password before continuing.' }}
+      />
+    );
   }
 
   if (allowedRoles?.length && !allowedRoles.some((role) => roles.includes(role))) {

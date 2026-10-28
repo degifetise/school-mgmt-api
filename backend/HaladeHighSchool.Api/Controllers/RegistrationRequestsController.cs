@@ -124,7 +124,11 @@ public class RegistrationRequestsController : PortalControllerBase
                 Detail = $"An unexpected error occurred. Provide reference ID {traceId} to support.",
                 Status = StatusCodes.Status500InternalServerError,
                 Instance = HttpContext.Request.Path,
-                Extensions = { ["traceId"] = traceId },
+                Extensions =
+                {
+                    ["traceId"] = traceId,
+                    ["message"] = $"Approval failed unexpectedly. Reference ID: {traceId}.",
+                },
             });
         }
     }
@@ -197,18 +201,21 @@ public class RegistrationRequestsController : PortalControllerBase
                 Title = result.Title,
                 Detail = detail,
                 Status = StatusCodes.Status404NotFound,
+                Extensions = { ["message"] = detail },
             }),
             RegistrationFailure.Conflict => Conflict(new ProblemDetails
             {
                 Title = result.Title,
                 Detail = detail,
                 Status = StatusCodes.Status409Conflict,
+                Extensions = { ["message"] = detail },
             }),
             _ => BadRequest(new ValidationProblemDetails
             {
                 Title = result.Title,
                 Status = StatusCodes.Status400BadRequest,
                 Errors = { ["registration"] = [.. result.Errors] },
+                Extensions = { ["message"] = detail },
             }),
         };
     }

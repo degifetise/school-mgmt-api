@@ -1,4 +1,5 @@
 using HaladeHighSchool.Api.DTOs;
+using HaladeHighSchool.Api.Middleware;
 using HaladeHighSchool.Api.Models;
 using HaladeHighSchool.Api.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -34,6 +35,7 @@ public class AccountController : ControllerBase
     /// cannot be used to edit an identity - posting extra fields has no effect.
     /// </summary>
     [HttpPost("change-password")]
+    [AllowDuringRequiredPasswordChange]
     [ProducesResponseType<ChangePasswordResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

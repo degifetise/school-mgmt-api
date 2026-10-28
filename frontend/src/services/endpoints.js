@@ -168,12 +168,22 @@ export const authApi = {
   login: (email, password) => unwrap(api.post('/api/auth/login', { email, password })),
   me: () => unwrap(api.get('/api/auth/me')),
   logout: (refreshToken) => unwrap(api.post('/api/auth/logout', { refreshToken })),
+  requestPasswordReset: (email) =>
+    unwrap(api.post('/api/auth/forgot-password-request', { email }, { retry: false })),
   /**
    * Anonymous application for a place. Resolves to a receipt, not a session: no account exists
    * until an administrator approves it and issues credentials.
    */
   registerStudent: (payload) =>
     unwrap(api.post('/api/auth/register-student-with-photo', toMultipartFormData(payload))),
+};
+
+export const passwordResetAdminApi = {
+  pending: () => unwrap(api.get('/api/admin/password-reset-requests/pending')),
+  approve: (requestId) =>
+    unwrap(api.post(`/api/admin/approve-password-reset/${requestId}`, {}, { retry: false })),
+  reject: (requestId) =>
+    unwrap(api.post(`/api/admin/reject-password-reset/${requestId}`, {}, { retry: false })),
 };
 
 export const smartIdApi = {
@@ -225,7 +235,13 @@ export const registrationApi = {
     unwrap(api.get('/api/admin/registration-requests', { params: { status } })),
   /** Resolves to the issued credentials, including the one-time temporary password. */
   approve: (id, note) =>
-    unwrap(api.post(`/api/admin/registration-requests/${id}/approve`, { note: note ?? null })),
+    unwrap(
+      api.post(
+        `/api/admin/registration-requests/${id}/approve`,
+        { note: note ?? null },
+        { retry: false },
+      ),
+    ),
   reject: (id, note) =>
     unwrap(api.post(`/api/admin/registration-requests/${id}/reject`, { note: note ?? null })),
 };

@@ -146,6 +146,9 @@ namespace HaladeHighSchool.Api.Migrations
                     b.Property<DateTimeOffset?>("LockoutEnd")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("MustChangePasswordOnLogin")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("NormalizedEmail")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
@@ -1003,15 +1006,48 @@ namespace HaladeHighSchool.Api.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-                    b.Property<DateTime>("ExpiresAt")
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasDefaultValue("");
+
+                    b.Property<DateTime?>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsApproved")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTime?>("ProcessedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("RequestDate")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<string>("RequestedFromIp")
                         .HasMaxLength(45)
                         .HasColumnType("character varying(45)");
 
-                    b.Property<string>("Token")
+                    b.Property<string>("Role")
                         .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Pending");
+
+                    b.Property<string>("Token")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
@@ -1028,6 +1064,9 @@ namespace HaladeHighSchool.Api.Migrations
                     b.HasIndex("Token")
                         .IsUnique()
                         .HasDatabaseName("UQ_PasswordResetRequests_Token");
+
+                    b.HasIndex("Status", "RequestDate")
+                        .HasDatabaseName("IX_PasswordResetRequests_Status_RequestDate");
 
                     b.HasIndex("UserId", "ExpiresAt")
                         .HasDatabaseName("IX_PasswordResetRequests_UserId_ExpiresAt");
@@ -1444,6 +1483,79 @@ namespace HaladeHighSchool.Api.Migrations
                     b.HasIndex("GradeLevelId", "SectionId");
 
                     b.ToTable("Students", (string)null);
+                });
+
+            modelBuilder.Entity("HaladeHighSchool.Api.Models.StudentConductLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<DateTime>("IncidentDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsVisibleToParent")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("IsVisibleToStudent")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("RecordedByName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("RecordedByRole")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("RecordedByUserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("character varying(450)");
+
+                    b.Property<int>("StudentId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RecordedByUserId")
+                        .HasDatabaseName("IX_StudentConductLogs_RecordedByUserId");
+
+                    b.HasIndex("StudentId", "IncidentDate")
+                        .HasDatabaseName("IX_StudentConductLogs_Student_IncidentDate");
+
+                    b.ToTable("StudentConductLogs", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_StudentConductLogs_Type", "\"Type\" IN ('Merit', 'Demerit', 'Disciplinary Note', 'General Behavioral Log')");
+                        });
                 });
 
             modelBuilder.Entity("HaladeHighSchool.Api.Models.StudentFeedback", b =>
@@ -2394,6 +2506,17 @@ namespace HaladeHighSchool.Api.Migrations
                     b.Navigation("Section");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("HaladeHighSchool.Api.Models.StudentConductLog", b =>
+                {
+                    b.HasOne("HaladeHighSchool.Api.Models.Student", "Student")
+                        .WithMany()
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Student");
                 });
 
             modelBuilder.Entity("HaladeHighSchool.Api.Models.StudentFeedback", b =>

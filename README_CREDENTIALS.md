@@ -38,6 +38,10 @@ values:
 - `SuperAdminSettings__Password`: unique SuperAdmin password.
 - `AdminSettings__Email` and `AdminSettings__Password`: credentials required by the
   current production Admin seeder.
+- `Resend__ApiKey` (or `EmailSettings__ApiKey`): Resend API key for registration
+  approval credential emails.
+- `EmailSettings__SenderEmail`: verified sender address configured for Resend.
+- `EmailSettings__SenderName` (optional): display name for approval emails.
 
 ASP.NET Core maps double underscores to configuration section separators, so
 `ConnectionStrings__DefaultConnection` is read by
@@ -48,6 +52,10 @@ The API uses a 15-minute access token and rotates refresh tokens. The `Jwt` sect
 also requires `Issuer`, `Audience`, and `Key`; provide `Jwt__Key` through a secret
 provider outside Development. User-secrets are loaded only in the Development
 environment.
+
+Registration approval emails are sent through Resend's HTTPS API. The
+`Resend__ApiKey` value takes precedence if both API key variables are configured.
+The sender address must belong to a domain verified in Resend.
 
 ## Optional development accounts
 

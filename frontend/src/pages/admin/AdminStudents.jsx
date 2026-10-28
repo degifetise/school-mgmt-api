@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BookOpen, Download, Layers, Plus, RefreshCw, Users, UsersRound } from 'lucide-react';
+import { BookOpen, Download, Layers, Plus, RefreshCw, ShieldAlert, Users, UsersRound } from 'lucide-react';
 import { bulkAdminApi, gradeLevelApi, reportPdfApi, sectionApi, studentApi, teacherApi } from '../../services/endpoints';
 import { extractErrorMessage } from '../../services/api';
 import { Alert, Badge, EmptyState, ErrorState, LoadingPanel, Spinner } from '../../components/ui/Feedback';
 import ProfilePhotoField from '../../components/auth/ProfilePhotoField';
 import { PAGE_SIZE, Pager, PeopleTable, RowActions, SearchBox, StatCard, totalPagesOf } from './adminShared';
+import ConductManager from '../../components/conduct/ConductManager';
 
 /** Enrol one student directly. Skips the approval queue: an administrator is the approval. */
 function NewStudentForm({ gradeLevels, sections, onCreated, onError }) {
@@ -115,6 +116,7 @@ export default function AdminStudents() {
   const [notice, setNotice] = useState(null);
 
   const [showCreate, setShowCreate] = useState(false);
+  const [conductStudent, setConductStudent] = useState(null);
   const [students, setStudents] = useState({ items: [], totalCount: 0, page: 1 });
   const [filters, setFilters] = useState({ search: '', gradeLevelId: '', sectionId: '' });
   const [page, setPage] = useState(1);
@@ -501,13 +503,24 @@ export default function AdminStudents() {
                   </Badge>
                 </td>
                 <td className="px-5 py-3">
-                  <RowActions
-                    busy={busyId === student.id}
-                    isActive={student.isActive}
-                    hasLogin={student.hasLogin}
-                    onToggle={() => toggleStudent(student)}
-                    onReset={() => resetPassword(student)}
-                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <RowActions
+                      busy={busyId === student.id}
+                      isActive={student.isActive}
+                      hasLogin={student.hasLogin}
+                      onToggle={() => toggleStudent(student)}
+                      onReset={() => resetPassword(student)}
+                    />
+                    <button
+                      type="button"
+                      className="btn-secondary !px-2.5 !py-2"
+                      onClick={() => setConductStudent(student)}
+                      aria-label={`View conduct for ${student.fullName}`}
+                      title="Student conduct"
+                    >
+                      <ShieldAlert className="size-4" aria-hidden="true" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             )}
@@ -521,6 +534,9 @@ export default function AdminStudents() {
           onChange={setPage}
         />
       </section>
+      {conductStudent && (
+        <ConductManager student={conductStudent} onClose={() => setConductStudent(null)} />
+      )}
     </div>
   );
 }

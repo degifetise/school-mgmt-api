@@ -27,6 +27,7 @@ public record UserProfileResponse
     public string Email { get; init; } = string.Empty;
     public string FullName { get; init; } = string.Empty;
     public string? ProfileImageUrl { get; init; }
+    public bool MustChangePasswordOnLogin { get; init; }
     public IReadOnlyList<string> Roles { get; init; } = [];
 
     /// <summary>Populated when the user is a student.</summary>

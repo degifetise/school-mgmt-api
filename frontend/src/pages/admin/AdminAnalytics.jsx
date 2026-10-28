@@ -5,6 +5,7 @@ import { GradeEnrollmentChart, PassFailChart } from '../../components/analytics/
 import { ErrorState, LoadingPanel } from '../../components/ui/Feedback';
 import { useApiResource } from '../../hooks/useApiResource';
 import { analyticsApi } from '../../services/endpoints';
+import PendingPasswordResets from '../../components/admin/PendingPasswordResets';
 
 export default function AdminAnalytics() {
   const fetchOverview = useCallback(() => analyticsApi.adminOverview(), []);
@@ -17,15 +18,25 @@ export default function AdminAnalytics() {
     [data],
   );
 
-  if (loading) return <LoadingPanel label="Loading school analytics…" />;
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <LoadingPanel label="Loading school analytics…" />
+        <PendingPasswordResets />
+      </div>
+    );
+  }
   if (error) {
     return (
-      <ErrorState
-        title="Could not load analytics"
-        message={error}
-        onRetry={reload}
-        retrying={reloading}
-      />
+      <div className="space-y-6">
+        <ErrorState
+          title="Could not load analytics"
+          message={error}
+          onRetry={reload}
+          retrying={reloading}
+        />
+        <PendingPasswordResets />
+      </div>
     );
   }
 
@@ -56,6 +67,8 @@ export default function AdminAnalytics() {
         <BarChart3 className="size-4" aria-hidden="true" />
         Pass/fail totals include active students with at least one published subject result.
       </p>
+
+      <PendingPasswordResets />
     </div>
   );
 }

@@ -10,6 +10,7 @@ import AdminSettings from './admin/AdminSettings';
 const MIN_PASSWORD_LENGTH = 8;
 
 function ChangePasswordCard() {
+  const { user, updateUser } = useAuth();
   const [form, setForm] = useState({ current: '', next: '', confirm: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -40,6 +41,9 @@ function ChangePasswordCard() {
     setSaving(true);
     try {
       const result = await accountApi.changePassword(form.current, form.next);
+      if (user?.mustChangePasswordOnLogin) {
+        updateUser({ mustChangePasswordOnLogin: false });
+      }
       setForm({ current: '', next: '', confirm: '' });
       setNotice(result?.message ?? 'Your password has been changed.');
     } catch (err) {
@@ -62,6 +66,11 @@ function ChangePasswordCard() {
       </div>
 
       <form onSubmit={submit} className="space-y-4 p-5">
+        {user?.mustChangePasswordOnLogin && (
+          <Alert variant="warning" title="Temporary password">
+            Change your temporary password before continuing to the rest of the portal.
+          </Alert>
+        )}
         {error && (
           <Alert variant="error" title="Could not change your password" onDismiss={() => setError(null)}>
             {error}

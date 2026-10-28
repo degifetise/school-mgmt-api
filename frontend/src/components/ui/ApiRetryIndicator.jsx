@@ -14,7 +14,7 @@ export default function ApiRetryIndicator() {
     >
       <div className="inline-flex items-center gap-2 rounded-full border border-brand-200 bg-white px-4 py-2 text-sm font-medium text-brand-800 shadow-lg">
         <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-        connecting to the server… retry {retryState.attempt}
+        connecting to the server… retry {retryState.attempt} of 3.
       </div>
     </div>
   );

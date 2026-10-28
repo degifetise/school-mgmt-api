@@ -113,7 +113,11 @@ function addRetryInterceptor(client) {
       if (!config) return Promise.reject(error);
 
       const retryCount = config.__retryCount ?? 0;
-      if (!isRetryableNetworkFailure(error) || retryCount >= MAX_API_RETRIES) {
+      if (
+        config.retry === false
+        || !isRetryableNetworkFailure(error)
+        || retryCount >= MAX_API_RETRIES
+      ) {
         finishApiRetry(config);
         return Promise.reject(error);
       }
@@ -263,7 +267,7 @@ api.interceptors.response.use(
       return Promise.reject(
         Object.assign(error, {
           friendlyMessage:
-"This can take up to 30 seconds on the first load—please wait a moment and try again.",
+         "Please wait a moment and try again.",
         }),
       );
     }

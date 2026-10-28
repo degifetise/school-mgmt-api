@@ -76,6 +76,16 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  const updateUser = useCallback((updates) => {
+    if (!mounted.current) return;
+    setUser((current) => {
+      if (!current) return current;
+      const next = { ...current, ...updates };
+      tokenStore.save({ user: next });
+      return next;
+    });
+  }, []);
+
   /* The stored profile renders the shell instantly, then /api/auth/me confirms the
      token is still good and picks up role or class changes made by an admin. */
   useEffect(() => {
@@ -162,8 +172,9 @@ export function AuthProvider({ children }) {
       isStudent: roles.includes(ROLES.student),
       login,
       logout,
+      updateUser,
     };
-  }, [user, initialising, sessionMessage, login, logout]);
+  }, [user, initialising, sessionMessage, login, logout, updateUser]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

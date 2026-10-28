@@ -72,6 +72,16 @@ public class AccountService : IAccountService
 
         if (result.Succeeded)
         {
+            var updated = await _db.Users
+                .Where(candidate => candidate.Id == user.Id && candidate.MustChangePasswordOnLogin)
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(candidate => candidate.MustChangePasswordOnLogin, false),
+                    cancellationToken);
+            if (updated > 0)
+            {
+                user.MustChangePasswordOnLogin = false;
+            }
+
             await _tokens.RevokeAllForUserAsync(user.Id, cancellationToken);
             var log = await WriteLogAsync(user.Id, PasswordChangeOutcome.Succeeded, null, context, cancellationToken);
 
