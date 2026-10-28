@@ -242,3 +242,29 @@ input[type='number'] {
     break-after: auto;
   }
 }
+
+
+
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent; 
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #1E3A8A; 
+  border-radius: 9999px; 
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #1E3A8A; 
+}
+
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #1E3A8A transparent;
+}

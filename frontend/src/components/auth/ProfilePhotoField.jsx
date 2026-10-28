@@ -65,7 +65,7 @@ export default function ProfilePhotoField({
 
   return (
     <div className="sm:col-span-full">
-      <span className="label">Profile photo (optional)</span>
+      <span className="label">Profile photo.</span>
       <div className="flex flex-wrap items-center gap-3">
         <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-full border border-slate-200 bg-slate-50 text-slate-400">
           {previewUrl ? (

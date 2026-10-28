@@ -293,7 +293,7 @@ export default function SideDashboard({
           </button>
         </div>
 
-        <nav className="min-h-0 flex-1 overflow-y-auto p-3" aria-label={`${roleLabel} dashboard`}>
+        <nav className="min-h-0 flex-1 custom-scrollbar  overflow-y-auto p-3" aria-label={`${roleLabel} dashboard`}>
           {items.map(({ label: sectionLabel, items: sectionItems }) => (
             <section key={sectionLabel ?? 'core'} className="mb-3">
               {sectionLabel && (

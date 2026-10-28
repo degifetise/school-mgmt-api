@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using HaladeHighSchool.Api.Configuration;
 using HaladeHighSchool.Api.Data;
 using HaladeHighSchool.Api.Models;
+using HaladeHighSchool.Api.Middleware;
 using HaladeHighSchool.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -12,6 +13,20 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using FluentValidation;
 using FluentValidation.AspNetCore;
+
+static string GetConfiguredValue(IConfiguration configuration, params string[] keys)
+{
+    foreach (var key in keys)
+    {
+        var value = configuration[key];
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            return value.Trim();
+        }
+    }
+
+    return string.Empty;
+}
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,6 +52,28 @@ builder.Services
         (!string.IsNullOrWhiteSpace(settings.FromAddress) && !string.IsNullOrWhiteSpace(settings.FromName)),
         "Email:FromAddress and Email:FromName are required when Email:SendGridApiKey is configured.")
     .ValidateOnStart();
+
+builder.Services
+    .AddOptions<ResendSettings>()
+    .Configure<IConfiguration>((settings, configuration) =>
+    {
+        configuration.GetSection(ResendSettings.SectionName).Bind(settings);
+        settings.ApiKey = GetConfiguredValue(
+            configuration,
+            "Resend:ApiKey",
+            "EmailSettings:ApiKey");
+        settings.FromAddress = GetConfiguredValue(
+            configuration,
+            "Resend:FromAddress",
+            "EmailSettings:SenderEmail",
+            "EmailSettings:FromAddress",
+            "Email:FromAddress");
+        settings.FromName = GetConfiguredValue(
+            configuration,
+            "Resend:FromName",
+            "EmailSettings:SenderName",
+            "Email:FromName");
+    });
 
 var jwtSettings = builder.Configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>()
     ?? throw new InvalidOperationException("The 'Jwt' configuration section is missing.");
@@ -223,8 +260,12 @@ builder.Services.AddScoped<IPdfReportCardService, PdfReportCardService>();
 builder.Services.AddScoped<IReportPdfService, ReportPdfService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IPasswordResetService, PasswordResetService>();
+builder.Services.AddScoped<IPasswordResetApprovalService, PasswordResetApprovalService>();
 builder.Services.AddScoped<IEmailSender, SendGridEmailSender>();
-builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddHttpClient<IEmailService, EmailService>(client =>
+{
+    client.BaseAddress = new Uri("https://api.resend.com/");
+});
 builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 builder.Services.AddScoped<IEventService, EventService>();
 builder.Services.AddSingleton<IEventImageStorage, EventImageStorage>();
@@ -318,6 +359,7 @@ app.Use(async (context, next) =>
 app.UseStaticFiles();
 
 app.UseAuthentication();
+app.UseMiddleware<RequiredPasswordChangeMiddleware>();
 app.UseAuthorization();
 app.MapControllers();
 

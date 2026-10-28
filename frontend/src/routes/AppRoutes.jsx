@@ -20,6 +20,7 @@ const AdminGrades = lazy(() => import('../pages/admin/AdminGrades'));
 const TeacherStudents = lazy(() => import('../pages/teacher/TeacherStudents'));
 const EnterMarks = lazy(() => import('../pages/teacher/EnterMarks'));
 const MyResults = lazy(() => import('../pages/student/MyResults'));
+const StudentConduct = lazy(() => import('../pages/student/StudentConduct'));
 const TeacherAssignments = lazy(() => import('../pages/admin/TeacherAssignments'));
 const SubjectManagementPage = lazy(() => import('../pages/admin/SubjectManagementPage'));
 const AttendancePage = lazy(() => import('../pages/teacher/AttendancePage'));
@@ -161,6 +162,7 @@ export default function AppRoutes() {
 
             <Route element={<ProtectedRoute allowedRoles={[ROLES.student]} />}>
               <Route path="/student/results" element={<MyResults />} />
+              <Route path="/student/conduct" element={<StudentConduct />} />
               <Route path="/student/feedback" element={<StudentFeedback />} />
             </Route>
 

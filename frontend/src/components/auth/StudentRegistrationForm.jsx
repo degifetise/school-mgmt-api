@@ -25,6 +25,7 @@ export default function StudentRegistrationForm({ gradeLevels = [], sections = [
     sectionId: '',
   });
   const [error, setError] = useState(null);
+  const [photoError, setPhotoError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [photo, setPhoto] = useState(null);
   const [photoPending, setPhotoPending] = useState(false);
@@ -34,10 +35,16 @@ export default function StudentRegistrationForm({ gradeLevels = [], sections = [
   async function submit(event) {
     event.preventDefault();
     setError(null);
-    if (photoPending) {
-      setError('Confirm or cancel the selected photo before submitting your registration.');
+
+    if (!photo || photoPending) {
+      setPhotoError('Please upload a profile photo that will be used to generate your digital Smart ID. You can only change it later by contacting the administrator.');
+      if (photoPending) {
+        setError('Confirm or cancel the selected photo before submitting your registration.');
+      }
       return;
     }
+
+    setPhotoError('');
     setSubmitting(true);
 
     try {
@@ -163,12 +170,27 @@ export default function StudentRegistrationForm({ gradeLevels = [], sections = [
         </div>
       </div>}
 
-      <ProfilePhotoField
-        file={photo}
-        onChange={setPhoto}
-        onPendingChange={setPhotoPending}
-        disabled={submitting}
-      />
+      <div>
+        <ProfilePhotoField
+          file={photo}
+          onChange={(nextPhoto) => {
+            setPhoto(nextPhoto);
+            if (nextPhoto) {
+              setPhotoError('');
+            }
+          }}
+          onPendingChange={(isPending) => {
+            setPhotoPending(isPending);
+            if (!isPending && photo) {
+              setPhotoError('');
+            }
+          }}
+          disabled={submitting}
+        />
+        {photoError && (
+          <p role="alert" className="mt-2 text-sm font-medium text-red-700">{photoError}</p>
+        )}
+      </div>
 
       <p className="rounded-lg border border-brand-100 bg-brand-50 px-3 py-2 text-sm text-brand-800">
         A unique Smart ID is generated automatically when your registration is approved. You can

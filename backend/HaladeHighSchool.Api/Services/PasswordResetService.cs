@@ -107,7 +107,8 @@ public class PasswordResetService : IPasswordResetService
         var request = await _db.PasswordResetRequests
             .Include(r => r.User)
             .FirstOrDefaultAsync(
-                r => r.Token == token && r.UsedAt == null && r.ExpiresAt > DateTime.UtcNow,
+                r => r.Token == token && r.UsedAt == null
+                    && r.ExpiresAt != null && r.ExpiresAt > DateTime.UtcNow,
                 cancellationToken);
 
         if (request?.User is null || !request.User.IsActive)

@@ -2,6 +2,7 @@ import {
   CalendarDays,
   ClipboardList,
   ClipboardCheck,
+  ShieldCheck,
   GraduationCap,
   Home,
   Info,
@@ -67,6 +68,13 @@ const NAV_ITEMS = [
     shortLabel: 'My Results',
     icon: GraduationCap,
     description: 'Weighted totals, letter grades and your report card',
+    roles: [ROLES.student],
+  },
+  {
+    to: '/student/conduct',
+    label: 'My Conduct',
+    icon: ShieldCheck,
+    description: 'View your conduct standing and shared history',
     roles: [ROLES.student],
   },
   {

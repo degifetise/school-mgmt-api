@@ -36,6 +36,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
     public DbSet<StudentRegistrationRequest> StudentRegistrationRequests => Set<StudentRegistrationRequest>();
     public DbSet<PasswordChangeLog> PasswordChangeLogs => Set<PasswordChangeLog>();
       public DbSet<PasswordResetRequest> PasswordResetRequests => Set<PasswordResetRequest>();
+      public DbSet<StudentConductLog> StudentConductLogs => Set<StudentConductLog>();
       public DbSet<Attendance> Attendance => Set<Attendance>();
       public DbSet<Event> Events => Set<Event>();
       public DbSet<EventRegistration> EventRegistrations => Set<EventRegistration>();
@@ -199,17 +200,51 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
         {
             entity.ToTable("PasswordResetRequests");
             entity.Property(r => r.UserId).HasMaxLength(450).IsRequired();
-            entity.Property(r => r.Token).HasMaxLength(256).IsRequired();
+            entity.Property(r => r.Token).HasMaxLength(256);
             entity.Property(r => r.RequestedFromIp).HasMaxLength(45);
             entity.Property(r => r.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(r => r.Email).HasMaxLength(256).HasDefaultValue(string.Empty).IsRequired();
+            entity.Property(r => r.Role).HasMaxLength(30).HasDefaultValue(string.Empty).IsRequired();
+            entity.Property(r => r.RequestDate).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(r => r.IsApproved).HasDefaultValue(false);
+            entity.Property(r => r.Status).HasMaxLength(20).HasDefaultValue("Pending").IsRequired();
             entity.HasIndex(r => r.Token).IsUnique().HasDatabaseName("UQ_PasswordResetRequests_Token");
             entity.HasIndex(r => new { r.UserId, r.ExpiresAt })
                   .HasDatabaseName("IX_PasswordResetRequests_UserId_ExpiresAt");
+            entity.HasIndex(r => new { r.Status, r.RequestDate })
+                  .HasDatabaseName("IX_PasswordResetRequests_Status_RequestDate");
 
             entity.HasOne(r => r.User)
                   .WithMany()
                   .HasForeignKey(r => r.UserId)
                   .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<StudentConductLog>(entity =>
+        {
+            entity.ToTable("StudentConductLogs", table =>
+                table.HasCheckConstraint(
+                    "CK_StudentConductLogs_Type",
+                    "\"Type\" IN ('Merit', 'Demerit', 'Disciplinary Note', 'General Behavioral Log')"));
+            entity.HasKey(log => log.Id);
+            entity.Property(log => log.RecordedByUserId).HasMaxLength(450).IsRequired();
+            entity.Property(log => log.RecordedByName).HasMaxLength(150).IsRequired();
+            entity.Property(log => log.RecordedByRole).HasMaxLength(30).IsRequired();
+            entity.Property(log => log.Type).HasMaxLength(40).IsRequired();
+            entity.Property(log => log.Title).HasMaxLength(150).IsRequired();
+            entity.Property(log => log.Description).HasMaxLength(4000).IsRequired();
+            entity.Property(log => log.IncidentDate).IsRequired();
+            entity.Property(log => log.IsVisibleToStudent).HasDefaultValue(true);
+            entity.Property(log => log.IsVisibleToParent).HasDefaultValue(true);
+            entity.Property(log => log.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.HasIndex(log => new { log.StudentId, log.IncidentDate })
+                .HasDatabaseName("IX_StudentConductLogs_Student_IncidentDate");
+            entity.HasIndex(log => log.RecordedByUserId)
+                .HasDatabaseName("IX_StudentConductLogs_RecordedByUserId");
+            entity.HasOne(log => log.Student)
+                .WithMany()
+                .HasForeignKey(log => log.StudentId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         builder.Entity<Attendance>(entity =>

@@ -1,6 +1,7 @@
 using HaladeHighSchool.Api.Data;
 using HaladeHighSchool.Api.Configuration;
 using HaladeHighSchool.Api.DTOs;
+using HaladeHighSchool.Api.Middleware;
 using HaladeHighSchool.Api.Models;
 using HaladeHighSchool.Api.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -22,6 +23,7 @@ public class AuthController : ControllerBase
     private readonly IRegistrationRequestService _registrations;
     private readonly ISystemSettingsService _settings;
     private readonly IPasswordResetService _passwordResets;
+    private readonly IPasswordResetApprovalService _passwordResetApprovals;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
@@ -32,6 +34,7 @@ public class AuthController : ControllerBase
         IRegistrationRequestService registrations,
         ISystemSettingsService settings,
         IPasswordResetService passwordResets,
+        IPasswordResetApprovalService passwordResetApprovals,
         ILogger<AuthController> logger)
     {
         _db = db;
@@ -41,6 +44,7 @@ public class AuthController : ControllerBase
         _registrations = registrations;
         _settings = settings;
         _passwordResets = passwordResets;
+        _passwordResetApprovals = passwordResetApprovals;
         _logger = logger;
     }
 
@@ -96,8 +100,8 @@ public class AuthController : ControllerBase
         });
 
     /// <summary>
-    /// Starts a password reset without revealing whether the email belongs to an account.
-    /// Email delivery is attached by the configured email sender.
+    /// Compatibility route for clients still calling the legacy forgot-password endpoint.
+    /// All reset requests now require administrator approval, and account existence is not revealed.
     /// </summary>
     [HttpPost("forgot-password")]
     [AllowAnonymous]
@@ -106,12 +110,24 @@ public class AuthController : ControllerBase
         ForgotPasswordRequest request,
         CancellationToken cancellationToken)
     {
-        await _passwordResets.RequestResetAsync(
-            request.Email,
-            HttpContext.Connection.RemoteIpAddress?.ToString(),
-            cancellationToken);
+        await _passwordResetApprovals.RequestAsync(request.Email, cancellationToken);
 
         return Accepted();
+    }
+
+    /// <summary>Submits an administrator-approved password reset request.</summary>
+    [HttpPost("forgot-password-request")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    public async Task<IActionResult> RequestApprovedPasswordReset(
+        ForgotPasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        await _passwordResetApprovals.RequestAsync(request.Email, cancellationToken);
+        return Accepted(new
+        {
+            message = "Your password reset request has been submitted to the school administration for approval. Once approved, a temporary password will be sent to your email."
+        });
     }
 
     /// <summary>Consumes a valid one-time reset token and applies the new password.</summary>
@@ -279,6 +295,7 @@ public class AuthController : ControllerBase
     /// <summary>Revokes the supplied refresh token.</summary>
     [HttpPost("logout")]
     [Authorize]
+    [AllowDuringRequiredPasswordChange]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> Logout(RefreshTokenRequest request, CancellationToken cancellationToken)
     {
@@ -289,6 +306,7 @@ public class AuthController : ControllerBase
     /// <summary>Returns the signed-in user's profile, including student or teacher context.</summary>
     [HttpGet("me")]
     [Authorize]
+    [AllowDuringRequiredPasswordChange]
     [ProducesResponseType<UserProfileResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<UserProfileResponse>> Me(CancellationToken cancellationToken)

@@ -158,6 +158,7 @@ public class TokenService : ITokenService
             Email = user.Email ?? string.Empty,
             FullName = user.FullName,
             ProfileImageUrl = user.ProfileImageUrl,
+            MustChangePasswordOnLogin = user.MustChangePasswordOnLogin,
             Roles = profile?.Roles ?? [],
             StudentId = profile?.StudentId,
             StudentIdNumber = profile?.StudentIdNumber,
