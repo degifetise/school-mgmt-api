@@ -1660,13 +1660,10 @@ namespace HaladeHighSchool.Api.Migrations
                     b.Property<int?>("CreatedStudentId")
                         .HasColumnType("integer");
 
-<<<<<<< HEAD
                     b.Property<string>("DepartmentSubject")
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
 
-=======
->>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(150)
@@ -1679,14 +1676,11 @@ namespace HaladeHighSchool.Api.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
-<<<<<<< HEAD
                     b.Property<string>("PhoneNumber")
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
-=======
->>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
                     b.Property<string>("PhotoUrl")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");

@@ -8,11 +8,8 @@ public record RegistrationRequestResponse
     public int Id { get; init; }
     public string FullName { get; init; } = string.Empty;
     public string ContactEmail { get; init; } = string.Empty;
-<<<<<<< HEAD
     public string PhoneNumber { get; init; } = string.Empty;
     public string? DepartmentSubject { get; init; }
-=======
->>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
     public string RequestedRole { get; init; } = "Student";
     public int? GradeLevelId { get; init; }
     public string? GradeLevelName { get; init; }

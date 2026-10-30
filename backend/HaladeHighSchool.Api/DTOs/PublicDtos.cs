@@ -38,10 +38,7 @@ public record PublicSection
     public int Id { get; init; }
     public string Name { get; init; } = string.Empty;
     public string Code { get; init; } = string.Empty;
-<<<<<<< HEAD
     public IReadOnlyList<int> GradeLevelIds { get; init; } = [];
-=======
->>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
 }
 
 public record PublicGradeLevel
