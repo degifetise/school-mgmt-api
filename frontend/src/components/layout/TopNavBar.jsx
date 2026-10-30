@@ -20,6 +20,8 @@ import { useSchoolInfo } from '../../context/SchoolInfoContext';
 import { notificationApi } from '../../services/endpoints';
 import { API_BASE_URL } from '../../services/api';
 import { navItemsFor } from './navigation';
+import useLogoutConfirmation from '../../hooks/useLogoutConfirmation';
+import LogoutConfirmationModal from '../auth/LogoutConfirmationModal';
 
 const ROLE_STYLE = {
   [ROLES.admin]: { chip: 'bg-amber-400/20 text-amber-100 ring-amber-300/30', Icon: ShieldCheck },
@@ -80,10 +82,11 @@ function IdentityLine({ user, roles }) {
 }
 
 export default function TopNavBar() {
-  const { user, roles, isAuthenticated, logout } = useAuth();
+  const { user, roles, isAuthenticated } = useAuth();
   const { schoolName, academicYear, logoUrl } = useSchoolInfo();
   const location = useLocation();
   const navigate = useNavigate();
+  const logoutConfirmation = useLogoutConfirmation();
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -422,7 +425,7 @@ export default function TopNavBar() {
  rather than hiding behind the menu. */}
                   <button
                     type="button"
-                    onClick={() => logout({ silent: false })}
+                    onClick={logoutConfirmation.requestLogout}
                     className="inline-flex items-center gap-2 rounded-lg bg-rose-500/90 px-2.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-rose-500 sm:px-3"
                   >
                     <LogOut className="size-4" aria-hidden="true" />
@@ -484,7 +487,7 @@ export default function TopNavBar() {
                           role="menuitem"
                           onClick={() => {
                             setMenuOpen(false);
-                            logout({ silent: false });
+                            logoutConfirmation.requestLogout();
                           }}
                           className="flex w-full items-center gap-2 px-4 py-3 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-50 "
                         >
@@ -572,7 +575,7 @@ export default function TopNavBar() {
                     type="button"
                     onClick={() => {
                       setMobileOpen(false);
-                      logout({ silent: false });
+                      logoutConfirmation.requestLogout();
                     }}
                     className="flex w-full items-center gap-3 rounded-lg bg-rose-500/15 px-3 py-2.5 text-sm font-semibold text-rose-200 transition-colors hover:bg-rose-500/25"
                   >
@@ -585,6 +588,12 @@ export default function TopNavBar() {
           </motion.div>
         )}
       </AnimatePresence>
+      <LogoutConfirmationModal
+        isOpen={logoutConfirmation.isOpen}
+        isLoggingOut={logoutConfirmation.isLoggingOut}
+        onCancel={logoutConfirmation.cancelLogout}
+        onConfirm={logoutConfirmation.confirmLogout}
+      />
     </header>
   );
 }

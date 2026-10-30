@@ -33,9 +33,7 @@
   }
 }
 
-/* Registered with @utility rather than declared in @layer components, because v4 only
- lets @apply reference real utilities. Each button variant therefore repeats the shared
- layout declarations instead of applying `btn`. */
+
 @utility card {
   @apply rounded-xl border border-slate-200 bg-white shadow-sm;
 }

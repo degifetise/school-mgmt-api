@@ -516,6 +516,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
             entity.ToTable("StudentRegistrationRequests");
             entity.Property(r => r.FullName).HasMaxLength(150).IsRequired();
             entity.Property(r => r.ContactEmail).HasMaxLength(256).IsRequired();
+            entity.Property(r => r.PhoneNumber).HasMaxLength(30).IsRequired();
+            entity.Property(r => r.DepartmentSubject).HasMaxLength(120);
             entity.Property(r => r.PhotoUrl).HasMaxLength(500);
             entity.Property(r => r.RequestedRole).HasMaxLength(20).HasDefaultValue("Student");
             entity.Property(r => r.Status).HasMaxLength(20).IsRequired();

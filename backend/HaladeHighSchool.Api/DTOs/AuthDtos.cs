@@ -53,7 +53,7 @@ public record UserProfileResponse
 /// issues both at approval, so an applicant cannot choose their own credentials or claim an
 /// identifier that is not theirs.
 /// </summary>
-public record RegisterStudentRequest
+public record RegisterStudentRequest : IValidatableObject
 {
     private string _fullName = string.Empty;
     private string _email = string.Empty;
@@ -71,7 +71,7 @@ public record RegisterStudentRequest
         init => _fullName = value?.Trim() ?? string.Empty;
     }
 
-    /// <summary>The applicant's own address. The issued credentials are sent here.</summary>
+    /// <summary>The contact address for the applicant or their parent/guardian.</summary>
     [Required(ErrorMessage = "An email address is required so the school can reach you.")]
     [EmailAddress(ErrorMessage = "That does not look like an email address.")]
     [MaxLength(256)]
@@ -82,14 +82,44 @@ public record RegisterStudentRequest
         init => _email = value?.Trim() ?? string.Empty;
     }
 
+    [Required(ErrorMessage = "A phone number is required.")]
+    [MaxLength(30)]
+    public string PhoneNumber { get; init; } = string.Empty;
+
+    [MaxLength(120)]
+    public string? DepartmentSubject { get; init; }
+
     [Range(1, int.MaxValue, ErrorMessage = "Choose a grade.")]
     public int? GradeLevelId { get; init; }
 
     [Range(1, int.MaxValue, ErrorMessage = "Choose a section.")]
     public int? SectionId { get; init; }
 
+    [Required(ErrorMessage = "A profile photo is required to generate your Smart ID.")]
     [JsonIgnore]
     public IFormFile? Photo { get; init; }
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (RequestedRole == "Student")
+        {
+            if (GradeLevelId is null or < 1)
+            {
+                yield return new ValidationResult("Choose a grade.", [nameof(GradeLevelId)]);
+            }
+
+            if (SectionId is null or < 1)
+            {
+                yield return new ValidationResult("Choose a section.", [nameof(SectionId)]);
+            }
+        }
+        else if (RequestedRole == "Teacher" && string.IsNullOrWhiteSpace(DepartmentSubject))
+        {
+            yield return new ValidationResult(
+                "Enter a department or subject.",
+                [nameof(DepartmentSubject)]);
+        }
+    }
 }
 
 /// <summary>

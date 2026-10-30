@@ -259,7 +259,8 @@ function RegistrationCard({ row, busy, onApprove, onReject }) {
   const [note, setNote] = useState('');
   const [noteOpen, setNoteOpen] = useState(false);
   const isPending = row.status === 'Pending';
-  const full = row.sectionOccupancy >= row.sectionCapacity;
+  const isStudent = row.requestedRole === 'Student';
+  const full = isStudent && row.sectionOccupancy >= row.sectionCapacity;
 
   return (
     <motion.li
@@ -271,8 +272,11 @@ function RegistrationCard({ row, busy, onApprove, onReject }) {
         <div className="min-w-0">
           <p className="font-semibold text-slate-900">{row.fullName}</p>
           <p className="text-sm text-slate-500">{row.contactEmail}</p>
+          <p className="text-sm text-slate-500">{row.phoneNumber}</p>
           <p className="mt-1 text-xs text-slate-500">
-            Applied as {row.requestedRole} {row.requestedRole === 'Student' ? `for ${row.gradeLevelName} ${row.sectionName}` : ''} ·{' '}
+            Applied as {row.requestedRole} {isStudent
+              ? `for ${row.gradeLevelName} ${row.sectionName}`
+              : `for ${row.departmentSubject}`} ·{' '}
             {new Date(row.submittedAt).toLocaleDateString()}
             {row.studentIdNumber ? (
               <>
@@ -292,10 +296,11 @@ function RegistrationCard({ row, busy, onApprove, onReject }) {
           <Badge tone={isPending ? 'amber' : row.status === 'Approved' ? 'green' : 'red'}>
             {row.status}
           </Badge>
-          {/* Seats matter at the moment of approval, so it is shown next to the decision. */}
-          <span className={`text-xs ${full ? 'font-semibold text-rose-600' : 'text-slate-500'}`}>
-            {row.sectionOccupancy}/{row.sectionCapacity} seats taken
-          </span>
+          {isStudent && (
+            <span className={`text-xs ${full ? 'font-semibold text-rose-600' : 'text-slate-500'}`}>
+              {row.sectionOccupancy}/{row.sectionCapacity} seats taken
+            </span>
+          )}
         </div>
       </div>
 

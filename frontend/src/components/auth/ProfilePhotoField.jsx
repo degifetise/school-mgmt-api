@@ -65,7 +65,7 @@ export default function ProfilePhotoField({
 
   return (
     <div className="sm:col-span-full">
-      <span className="label">Profile photo.</span>
+      <span className="label">Profile photo (required)</span>
       <div className="flex flex-wrap items-center gap-3">
         <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-full border border-slate-200 bg-slate-50 text-slate-400">
           {previewUrl ? (
@@ -84,6 +84,7 @@ export default function ProfilePhotoField({
             disabled={disabled}
             tabIndex={-1}
             aria-label="Choose a JPG or PNG profile photo"
+            aria-required="true"
           />
           <button
             type="button"

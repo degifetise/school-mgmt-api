@@ -1,5 +1,6 @@
 using HaladeHighSchool.Api.Data;
 using HaladeHighSchool.Api.DTOs;
+using HaladeHighSchool.Api.Models;
 using HaladeHighSchool.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -7,16 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HaladeHighSchool.Api.Controllers;
 
-/// <summary>
-/// The anonymous read surface behind the public site: the home, about and events pages.
-/// Every other controller requires a token, so keeping these few endpoints in one place makes
-/// the whole unauthenticated surface auditable from a single file.
-///
-/// Two rules hold everywhere below:
-///   * aggregates only - never a student, teacher, mark or lesson;
-///   * published, school-wide content only - anything scoped to a role, grade or section
-///     stays behind /api/announcements, which requires a token.
-/// </summary>
+
 [ApiController]
 [Route("api/public")]
 [AllowAnonymous]
@@ -61,12 +53,34 @@ public class PublicController : PortalControllerBase
             })
             .ToListAsync(cancellationToken);
 
-        var sections = await _db.Sections
+        var sectionRows = await _db.Sections
             .AsNoTracking()
             .Where(s => s.IsActive)
             .OrderBy(s => s.Code)
-            .Select(s => new PublicSection { Id = s.Id, Name = s.Name, Code = s.Code })
+            .Select(s => new { s.Id, s.Name, s.Code })
             .ToListAsync(cancellationToken);
+
+        var sectionGrades = await _db.SchoolGradeSections
+            .AsNoTracking()
+            .Where(link => link.SchoolId == School.DefaultSchoolId
+                && link.GradeLevel != null
+                && link.GradeLevel.IsActive
+                && link.Section != null
+                && link.Section.IsActive)
+            .Select(link => new { link.SectionId, link.GradeLevelId })
+            .ToListAsync(cancellationToken);
+        var gradeIdsBySection = sectionGrades
+            .GroupBy(link => link.SectionId)
+            .ToDictionary(group => group.Key, group => (IReadOnlyList<int>)group.Select(link => link.GradeLevelId).ToArray());
+        var sections = sectionRows
+            .Select(section => new PublicSection
+            {
+                Id = section.Id,
+                Name = section.Name,
+                Code = section.Code,
+                GradeLevelIds = gradeIdsBySection.GetValueOrDefault(section.Id, []),
+            })
+            .ToList();
 
         var totals = new PublicTotals
         {

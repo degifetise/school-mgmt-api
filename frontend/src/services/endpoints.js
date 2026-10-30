@@ -98,7 +98,12 @@ export const schoolApi = {
   getRegistrationInfo: (slug) =>
     unwrap(api.get(`/api/public/schools/slug/${encodeURIComponent(slug)}`)),
   registerBySlug: (slug, payload) =>
-    unwrap(api.post(`/api/public/schools/slug/${encodeURIComponent(slug)}/register`, payload)),
+    unwrap(
+      api.post(
+        `/api/public/schools/slug/${encodeURIComponent(slug)}/register`,
+        toMultipartFormData(payload),
+      ),
+    ),
   getTenant: (schoolId) => unwrap(api.get(`/api/admin/schools/${encodeURIComponent(schoolId)}`)),
   updateName: (schoolId, name) =>
     unwrap(api.put(`/api/admin/schools/${encodeURIComponent(schoolId)}`, { name })),

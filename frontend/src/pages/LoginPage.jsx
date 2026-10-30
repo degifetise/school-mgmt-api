@@ -42,6 +42,7 @@ export default function LoginPage() {
   /* Registration lives here rather than in the navigation bar: it is the same errand as signing
      in, and a visitor who cannot get in is already on this screen. */
   const [registering, setRegistering] = useState(false);
+  const [registrationRole, setRegistrationRole] = useState('Student');
   const [submittedNotice, setSubmittedNotice] = useState(null);
 
   if (!initialising && isAuthenticated) {
@@ -178,7 +179,7 @@ export default function LoginPage() {
 
           <div className="card p-6 sm:p-8">
             <h2 className="text-xl font-bold text-slate-900">
-              {registering ? 'Register as a student' : 'Sign in'}
+              {registering ? `Register as a ${registrationRole.toLowerCase()}` : 'Sign in'}
             </h2>
             <p className="mt-1 mb-6 text-sm text-slate-500">
               {registering
@@ -223,6 +224,8 @@ export default function LoginPage() {
               <StudentRegistrationForm
                 gradeLevels={overview.data?.gradeLevels ?? []}
                 sections={overview.data?.sections ?? []}
+                initialRole={registrationRole}
+                onRoleChange={setRegistrationRole}
                 onSubmitted={(message) => {
                   setSubmittedNotice(message);
                   setRegistering(false);
@@ -308,13 +311,13 @@ export default function LoginPage() {
                 }}
                 className="mt-5 w-full rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-brand-700 transition-colors hover:bg-brand-50"
               >
-                {registering ? 'Back to sign in' : 'New student? Register here'}
+                {registering ? 'Back to sign in' : 'New student or teacher? Register here'}
               </button>
             )}
 
             <p className="mt-6 text-center text-xs text-slate-500">
               {registrationOpen
-                ? 'An administrator reviews each registration and issues your credentials; staff accounts are created for you.'
+                ? 'An administrator reviews student and teacher applications; other staff accounts are created by the school.'
                 : 'Accounts are created by the school administrator.'}
               {contactEmail && (
                 <>
@@ -378,6 +381,9 @@ export default function LoginPage() {
                   }}
                   disabled={forgotSubmitting}
                 />
+                <span className="mt-1 block text-xs text-slate-500">
+                  Students may use the parent/personal email supplied during registration.
+                </span>
               </label>
               <div className="flex justify-end gap-2">
                 <button

@@ -81,8 +81,10 @@ public sealed class PublicSchoolRegistrationController : PortalControllerBase
             grades));
     }
 
-    /// <summary>Submits a student application for the school identified by the URL slug.</summary>
+    /// <summary>Submits a student or teacher application for the school identified by the URL slug.</summary>
     [HttpPost("register")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit((2 * 1024 * 1024) + (64 * 1024))]
     [ProducesResponseType<RegistrationSubmittedResponse>(StatusCodes.Status202Accepted)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
@@ -90,7 +92,7 @@ public sealed class PublicSchoolRegistrationController : PortalControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Register(
         string slug,
-        RegisterStudentRequest request,
+        [FromForm] RegisterStudentRequest request,
         CancellationToken cancellationToken)
     {
         var schoolId = await _db.Schools.AsNoTracking()
@@ -107,11 +109,6 @@ public sealed class PublicSchoolRegistrationController : PortalControllerBase
             return PublicRegistrationClosed();
         }
 
-        if (request.RequestedRole != "Student")
-        {
-            return BadRequestProblem("Student registration only", "Only student applications are accepted on this route.");
-        }
-
         if (!await _settings.IsSelfRegistrationAllowedAsync(cancellationToken))
         {
             return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
@@ -122,7 +119,15 @@ public sealed class PublicSchoolRegistrationController : PortalControllerBase
             });
         }
 
-        var result = await _registrations.SubmitAsync(request, cancellationToken, schoolId.Id);
+        RegistrationResult<StudentRegistrationRequest> result;
+        try
+        {
+            result = await _registrations.SubmitAsync(request, cancellationToken, schoolId.Id);
+        }
+        catch (InvalidProfilePhotoException exception)
+        {
+            return BadRequestProblem("Invalid profile photo", exception.Message);
+        }
         if (result.Succeeded && result.Value is { } submitted)
         {
             return Accepted(new RegistrationSubmittedResponse

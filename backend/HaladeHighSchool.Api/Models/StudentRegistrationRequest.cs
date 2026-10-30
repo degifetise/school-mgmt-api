@@ -39,6 +39,10 @@ public class StudentRegistrationRequest
     /// </summary>
     public string ContactEmail { get; set; } = string.Empty;
 
+    public string PhoneNumber { get; set; } = string.Empty;
+
+    public string? DepartmentSubject { get; set; }
+
     public string? PhotoUrl { get; set; }
 
     public int? GradeLevelId { get; set; }

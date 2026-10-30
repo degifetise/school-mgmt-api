@@ -42,6 +42,30 @@ public sealed class PasswordResetApprovalService : IPasswordResetApprovalService
     {
         var normalizedEmail = email.Trim();
         var user = await _userManager.FindByEmailAsync(normalizedEmail);
+        var deliveryEmail = normalizedEmail;
+        if (user is null)
+        {
+            var registration = await _db.StudentRegistrationRequests
+                .AsNoTracking()
+                .Where(request => request.Status == RegistrationRequestStatus.Approved
+                    && request.ContactEmail.ToUpper() == normalizedEmail.ToUpper()
+                    && request.CreatedStudent != null
+                    && request.CreatedStudent.UserId != null)
+                .OrderByDescending(request => request.SubmittedAt)
+                .Select(request => new
+                {
+                    UserId = request.CreatedStudent!.UserId!,
+                    request.ContactEmail,
+                })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (registration is not null)
+            {
+                user = await _userManager.FindByIdAsync(registration.UserId);
+                deliveryEmail = registration.ContactEmail;
+            }
+        }
+
         if (user is null || !user.IsActive)
         {
             return;
@@ -78,13 +102,31 @@ public sealed class PasswordResetApprovalService : IPasswordResetApprovalService
         _db.PasswordResetRequests.Add(new PasswordResetRequest
         {
             UserId = user.Id,
-            Email = user.Email ?? normalizedEmail,
+            Email = deliveryEmail,
             Role = role,
             RequestDate = now,
             CreatedAt = now,
             Status = PendingStatus,
             IsApproved = false,
         });
+
+        var admins = (await _userManager.GetUsersInRoleAsync(Roles.Admin))
+            .Concat(await _userManager.GetUsersInRoleAsync(Roles.SchoolAdmin))
+            .Where(admin => admin.SchoolId == user.SchoolId)
+            .DistinctBy(admin => admin.Id);
+        foreach (var admin in admins)
+        {
+            _db.Notifications.Add(new Notification
+            {
+                UserId = admin.Id,
+                Title = "Password reset awaiting approval",
+                Message = $"{role} {user.FullName} requested a password reset.",
+                Type = "PasswordReset",
+                TargetUrl = "/admin/dashboard",
+                CreatedAt = now,
+            });
+        }
+
         await _db.SaveChangesAsync(cancellationToken);
     }
 
@@ -178,7 +220,7 @@ public sealed class PasswordResetApprovalService : IPasswordResetApprovalService
         try
         {
             await _emailService.SendPasswordResetApprovedEmailAsync(
-                approvedRequest.User.Email ?? approvedRequest.Email,
+                approvedRequest.Email,
                 approvedRequest.User.FullName,
                 temporaryPassword,
                 BuildLoginUrl(),
