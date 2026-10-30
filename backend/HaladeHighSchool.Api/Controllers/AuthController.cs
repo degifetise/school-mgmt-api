@@ -155,10 +155,31 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
+<<<<<<< HEAD
     /// Submits a student or teacher application. Anonymous, and allowed only while the
     /// AllowSelfRegistration system setting is on. The request remains pending until approved.
     /// </summary>
     [HttpPost("register-student")]
+=======
+    /// Submits an application for a place. Anonymous, and allowed only while the
+    /// AllowSelfRegistration system setting is on.
+    ///
+    /// Nothing is provisioned here: the request is recorded as Pending and an administrator
+    /// issues the student number, the school sign-in address and a temporary password when they
+    /// approve it. That is why the response carries no token and no credentials.
+    /// </summary>
+    [HttpPost("register-student")]
+    [AllowAnonymous]
+    [ProducesResponseType<RegistrationSubmittedResponse>(StatusCodes.Status202Accepted)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public Task<IActionResult> RegisterStudent(
+        [FromBody] RegisterStudentRequest request,
+        CancellationToken cancellationToken)
+        => SubmitRegistrationAsync(request, cancellationToken);
+
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
     [HttpPost("register-student-with-photo")]
     [AllowAnonymous]
     [Consumes("multipart/form-data")]
@@ -167,7 +188,11 @@ public class AuthController : ControllerBase
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
+<<<<<<< HEAD
     public Task<IActionResult> RegisterStudent(
+=======
+    public Task<IActionResult> RegisterStudentWithPhoto(
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
         [FromForm] RegisterStudentRequest request,
         CancellationToken cancellationToken)
         => SubmitRegistrationAsync(request, cancellationToken);

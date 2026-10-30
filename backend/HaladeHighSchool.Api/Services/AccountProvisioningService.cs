@@ -89,7 +89,14 @@ public record ProvisionResult<T> where T : class
 
 public interface IAccountProvisioningService
 {
+<<<<<<< HEAD
   
+=======
+    /// <summary>
+    /// Creates the Identity login and the Students row together. Both are written in one
+    /// transaction so a failure never leaves an account without a student profile.
+    /// </summary>
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
     /// <param name="onCreated">Optional related state to persist in the same transaction.</param>
     Task<ProvisionResult<Student>> CreateStudentAsync(
         ProvisionStudentRequest request,

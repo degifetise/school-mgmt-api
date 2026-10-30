@@ -1,11 +1,16 @@
 @baseUrl = http://localhost:5006
 @schoolSlug = example-high-school
 
+<<<<<<< HEAD
 
+=======
+### Resolve a school registration page and its configured grades/sections
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
 GET {{baseUrl}}/api/public/schools/slug/{{schoolSlug}}
 
 ### Submit a student registration to this school only
 POST {{baseUrl}}/api/public/schools/slug/{{schoolSlug}}/register
+<<<<<<< HEAD
 Content-Type: multipart/form-data; boundary=HaladeRegistrationBoundary
 
 --HaladeRegistrationBoundary
@@ -69,3 +74,14 @@ Content-Type: image/jpeg
 
 < ./profile.jpg
 --HaladeRegistrationBoundary--
+=======
+Content-Type: application/json
+
+{
+  "requestedRole": "Student",
+  "fullName": "Alex Example",
+  "email": "alex@example.com",
+  "gradeLevelId": 1,
+  "sectionId": 1
+}
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478

@@ -42,7 +42,10 @@ export default function LoginPage() {
   /* Registration lives here rather than in the navigation bar: it is the same errand as signing
      in, and a visitor who cannot get in is already on this screen. */
   const [registering, setRegistering] = useState(false);
+<<<<<<< HEAD
   const [registrationRole, setRegistrationRole] = useState('Student');
+=======
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
   const [submittedNotice, setSubmittedNotice] = useState(null);
 
   if (!initialising && isAuthenticated) {
@@ -179,7 +182,11 @@ export default function LoginPage() {
 
           <div className="card p-6 sm:p-8">
             <h2 className="text-xl font-bold text-slate-900">
+<<<<<<< HEAD
               {registering ? `Register as a ${registrationRole.toLowerCase()}` : 'Sign in'}
+=======
+              {registering ? 'Register as a student' : 'Sign in'}
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
             </h2>
             <p className="mt-1 mb-6 text-sm text-slate-500">
               {registering
@@ -224,8 +231,11 @@ export default function LoginPage() {
               <StudentRegistrationForm
                 gradeLevels={overview.data?.gradeLevels ?? []}
                 sections={overview.data?.sections ?? []}
+<<<<<<< HEAD
                 initialRole={registrationRole}
                 onRoleChange={setRegistrationRole}
+=======
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
                 onSubmitted={(message) => {
                   setSubmittedNotice(message);
                   setRegistering(false);
@@ -311,13 +321,21 @@ export default function LoginPage() {
                 }}
                 className="mt-5 w-full rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-brand-700 transition-colors hover:bg-brand-50"
               >
+<<<<<<< HEAD
                 {registering ? 'Back to sign in' : 'New student or teacher? Register here'}
+=======
+                {registering ? 'Back to sign in' : 'New student? Register here'}
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
               </button>
             )}
 
             <p className="mt-6 text-center text-xs text-slate-500">
               {registrationOpen
+<<<<<<< HEAD
                 ? 'An administrator reviews student and teacher applications; other staff accounts are created by the school.'
+=======
+                ? 'An administrator reviews each registration and issues your credentials; staff accounts are created for you.'
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
                 : 'Accounts are created by the school administrator.'}
               {contactEmail && (
                 <>
@@ -381,9 +399,12 @@ export default function LoginPage() {
                   }}
                   disabled={forgotSubmitting}
                 />
+<<<<<<< HEAD
                 <span className="mt-1 block text-xs text-slate-500">
                   Students may use the parent/personal email supplied during registration.
                 </span>
+=======
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
               </label>
               <div className="flex justify-end gap-2">
                 <button

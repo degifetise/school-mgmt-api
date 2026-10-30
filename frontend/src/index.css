@@ -33,7 +33,13 @@
   }
 }
 
+<<<<<<< HEAD
 
+=======
+/* Registered with @utility rather than declared in @layer components, because v4 only
+ lets @apply reference real utilities. Each button variant therefore repeats the shared
+ layout declarations instead of applying `btn`. */
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
 @utility card {
   @apply rounded-xl border border-slate-200 bg-white shadow-sm;
 }

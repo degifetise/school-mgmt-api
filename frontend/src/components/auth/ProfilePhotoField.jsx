@@ -65,7 +65,11 @@ export default function ProfilePhotoField({
 
   return (
     <div className="sm:col-span-full">
+<<<<<<< HEAD
       <span className="label">Profile photo (required)</span>
+=======
+      <span className="label">Profile photo.</span>
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
       <div className="flex flex-wrap items-center gap-3">
         <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-full border border-slate-200 bg-slate-50 text-slate-400">
           {previewUrl ? (
@@ -84,7 +88,10 @@ export default function ProfilePhotoField({
             disabled={disabled}
             tabIndex={-1}
             aria-label="Choose a JPG or PNG profile photo"
+<<<<<<< HEAD
             aria-required="true"
+=======
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
           />
           <button
             type="button"

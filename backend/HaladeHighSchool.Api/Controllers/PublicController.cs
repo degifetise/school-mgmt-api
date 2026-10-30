@@ -1,6 +1,9 @@
 using HaladeHighSchool.Api.Data;
 using HaladeHighSchool.Api.DTOs;
+<<<<<<< HEAD
 using HaladeHighSchool.Api.Models;
+=======
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
 using HaladeHighSchool.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -8,7 +11,20 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HaladeHighSchool.Api.Controllers;
 
+<<<<<<< HEAD
 
+=======
+/// <summary>
+/// The anonymous read surface behind the public site: the home, about and events pages.
+/// Every other controller requires a token, so keeping these few endpoints in one place makes
+/// the whole unauthenticated surface auditable from a single file.
+///
+/// Two rules hold everywhere below:
+///   * aggregates only - never a student, teacher, mark or lesson;
+///   * published, school-wide content only - anything scoped to a role, grade or section
+///     stays behind /api/announcements, which requires a token.
+/// </summary>
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
 [ApiController]
 [Route("api/public")]
 [AllowAnonymous]
@@ -53,6 +69,7 @@ public class PublicController : PortalControllerBase
             })
             .ToListAsync(cancellationToken);
 
+<<<<<<< HEAD
         var sectionRows = await _db.Sections
             .AsNoTracking()
             .Where(s => s.IsActive)
@@ -82,6 +99,15 @@ public class PublicController : PortalControllerBase
             })
             .ToList();
 
+=======
+        var sections = await _db.Sections
+            .AsNoTracking()
+            .Where(s => s.IsActive)
+            .OrderBy(s => s.Code)
+            .Select(s => new PublicSection { Id = s.Id, Name = s.Name, Code = s.Code })
+            .ToListAsync(cancellationToken);
+
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
         var totals = new PublicTotals
         {
             Students = await _db.Students.CountAsync(s => s.IsActive, cancellationToken),

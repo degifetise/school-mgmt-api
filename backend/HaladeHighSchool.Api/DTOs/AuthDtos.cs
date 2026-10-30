@@ -53,7 +53,11 @@ public record UserProfileResponse
 /// issues both at approval, so an applicant cannot choose their own credentials or claim an
 /// identifier that is not theirs.
 /// </summary>
+<<<<<<< HEAD
 public record RegisterStudentRequest : IValidatableObject
+=======
+public record RegisterStudentRequest
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
 {
     private string _fullName = string.Empty;
     private string _email = string.Empty;
@@ -71,7 +75,11 @@ public record RegisterStudentRequest : IValidatableObject
         init => _fullName = value?.Trim() ?? string.Empty;
     }
 
+<<<<<<< HEAD
     /// <summary>The contact address for the applicant or their parent/guardian.</summary>
+=======
+    /// <summary>The applicant's own address. The issued credentials are sent here.</summary>
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
     [Required(ErrorMessage = "An email address is required so the school can reach you.")]
     [EmailAddress(ErrorMessage = "That does not look like an email address.")]
     [MaxLength(256)]
@@ -82,6 +90,7 @@ public record RegisterStudentRequest : IValidatableObject
         init => _email = value?.Trim() ?? string.Empty;
     }
 
+<<<<<<< HEAD
     [Required(ErrorMessage = "A phone number is required.")]
     [MaxLength(30)]
     public string PhoneNumber { get; init; } = string.Empty;
@@ -89,12 +98,15 @@ public record RegisterStudentRequest : IValidatableObject
     [MaxLength(120)]
     public string? DepartmentSubject { get; init; }
 
+=======
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
     [Range(1, int.MaxValue, ErrorMessage = "Choose a grade.")]
     public int? GradeLevelId { get; init; }
 
     [Range(1, int.MaxValue, ErrorMessage = "Choose a section.")]
     public int? SectionId { get; init; }
 
+<<<<<<< HEAD
     [Required(ErrorMessage = "A profile photo is required to generate your Smart ID.")]
     [JsonIgnore]
     public IFormFile? Photo { get; init; }
@@ -120,6 +132,10 @@ public record RegisterStudentRequest : IValidatableObject
                 [nameof(DepartmentSubject)]);
         }
     }
+=======
+    [JsonIgnore]
+    public IFormFile? Photo { get; init; }
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
 }
 
 /// <summary>

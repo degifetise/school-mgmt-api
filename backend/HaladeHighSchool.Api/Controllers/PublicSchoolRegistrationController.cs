@@ -81,10 +81,15 @@ public sealed class PublicSchoolRegistrationController : PortalControllerBase
             grades));
     }
 
+<<<<<<< HEAD
     /// <summary>Submits a student or teacher application for the school identified by the URL slug.</summary>
     [HttpPost("register")]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit((2 * 1024 * 1024) + (64 * 1024))]
+=======
+    /// <summary>Submits a student application for the school identified by the URL slug.</summary>
+    [HttpPost("register")]
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
     [ProducesResponseType<RegistrationSubmittedResponse>(StatusCodes.Status202Accepted)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
@@ -92,7 +97,11 @@ public sealed class PublicSchoolRegistrationController : PortalControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Register(
         string slug,
+<<<<<<< HEAD
         [FromForm] RegisterStudentRequest request,
+=======
+        RegisterStudentRequest request,
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
         CancellationToken cancellationToken)
     {
         var schoolId = await _db.Schools.AsNoTracking()
@@ -109,6 +118,14 @@ public sealed class PublicSchoolRegistrationController : PortalControllerBase
             return PublicRegistrationClosed();
         }
 
+<<<<<<< HEAD
+=======
+        if (request.RequestedRole != "Student")
+        {
+            return BadRequestProblem("Student registration only", "Only student applications are accepted on this route.");
+        }
+
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
         if (!await _settings.IsSelfRegistrationAllowedAsync(cancellationToken))
         {
             return StatusCode(StatusCodes.Status403Forbidden, new ProblemDetails
@@ -119,6 +136,7 @@ public sealed class PublicSchoolRegistrationController : PortalControllerBase
             });
         }
 
+<<<<<<< HEAD
         RegistrationResult<StudentRegistrationRequest> result;
         try
         {
@@ -128,6 +146,9 @@ public sealed class PublicSchoolRegistrationController : PortalControllerBase
         {
             return BadRequestProblem("Invalid profile photo", exception.Message);
         }
+=======
+        var result = await _registrations.SubmitAsync(request, cancellationToken, schoolId.Id);
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
         if (result.Succeeded && result.Value is { } submitted)
         {
             return Accepted(new RegistrationSubmittedResponse

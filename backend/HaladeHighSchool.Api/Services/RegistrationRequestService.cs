@@ -120,6 +120,7 @@ public class RegistrationRequestService : IRegistrationRequestService
                 "This school is not currently accepting registration requests.");
         }
 
+<<<<<<< HEAD
         if (request.RequestedRole is not (Roles.Student or Roles.Teacher)
             || string.IsNullOrWhiteSpace(request.PhoneNumber)
             || request.Photo is null
@@ -132,6 +133,8 @@ public class RegistrationRequestService : IRegistrationRequestService
                 "A phone number and profile photo are required; teachers must also provide a department or subject.");
         }
 
+=======
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
         var contactEmail = request.Email.Trim();
         var requestedRole = request.RequestedRole;
         GradeLevel? gradeLevel = null;
@@ -209,7 +212,15 @@ public class RegistrationRequestService : IRegistrationRequestService
                 "A registration for this email address is already waiting to be reviewed.");
         }
 
+<<<<<<< HEAD
         var photoUrl = await _photoStorage.SaveAsync(request.Photo, cancellationToken);
+=======
+        string? photoUrl = null;
+        if (request.Photo is not null)
+        {
+            photoUrl = await _photoStorage.SaveAsync(request.Photo, cancellationToken);
+        }
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
 
         var entity = new StudentRegistrationRequest
         {
@@ -217,10 +228,13 @@ public class RegistrationRequestService : IRegistrationRequestService
             School = targetSchool,
             FullName = request.FullName.Trim(),
             ContactEmail = contactEmail,
+<<<<<<< HEAD
             PhoneNumber = request.PhoneNumber.Trim(),
             DepartmentSubject = requestedRole == Roles.Teacher
                 ? request.DepartmentSubject?.Trim()
                 : null,
+=======
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
             PhotoUrl = photoUrl,
             RequestedRole = requestedRole,
             GradeLevelId = request.GradeLevelId,
@@ -229,9 +243,17 @@ public class RegistrationRequestService : IRegistrationRequestService
             SubmittedAt = DateTime.UtcNow,
         };
 
+<<<<<<< HEAD
         var admins = (await _userManager.GetUsersInRoleAsync(Roles.Admin))
             .Where(admin => admin.SchoolId == targetSchoolId)
             .ToList();
+=======
+        var admins = requestedRole == Roles.Student
+            ? (await _userManager.GetUsersInRoleAsync(Roles.Admin))
+                .Where(admin => admin.SchoolId == targetSchoolId)
+                .ToList()
+            : [];
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
 
         _db.StudentRegistrationRequests.Add(entity);
         foreach (var admin in admins)
@@ -239,8 +261,13 @@ public class RegistrationRequestService : IRegistrationRequestService
             _db.Notifications.Add(new Notification
             {
                 UserId = admin.Id,
+<<<<<<< HEAD
                 Title = $"{requestedRole} registration pending review",
                 Message = $"New {requestedRole.ToLowerInvariant()} registration pending review for {entity.FullName}",
+=======
+                Title = "Student registration pending review",
+                Message = $"New student registration pending review for {entity.FullName}",
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
                 Type = "Registration",
                 TargetUrl = "/admin/accounts",
                 CreatedAt = DateTime.UtcNow,
@@ -296,8 +323,11 @@ public class RegistrationRequestService : IRegistrationRequestService
                 r.SchoolId,
                 r.FullName,
                 r.ContactEmail,
+<<<<<<< HEAD
                 r.PhoneNumber,
                 r.DepartmentSubject,
+=======
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
                 r.RequestedRole,
                 r.GradeLevelId,
                 GradeLevelName = r.GradeLevel != null ? r.GradeLevel.Name : null,
@@ -338,8 +368,11 @@ public class RegistrationRequestService : IRegistrationRequestService
                 Id = r.Id,
                 FullName = r.FullName,
                 ContactEmail = r.ContactEmail,
+<<<<<<< HEAD
                 PhoneNumber = r.PhoneNumber,
                 DepartmentSubject = r.DepartmentSubject,
+=======
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
                 RequestedRole = r.RequestedRole,
                 GradeLevelId = r.GradeLevelId,
                 GradeLevelName = r.GradeLevelName,
@@ -415,6 +448,7 @@ public class RegistrationRequestService : IRegistrationRequestService
         }
 
         var isTeacher = request.RequestedRole == "Teacher";
+<<<<<<< HEAD
         if (string.IsNullOrWhiteSpace(request.PhotoUrl)
             || string.IsNullOrWhiteSpace(request.PhoneNumber)
             || (isTeacher && string.IsNullOrWhiteSpace(request.DepartmentSubject)))
@@ -425,6 +459,8 @@ public class RegistrationRequestService : IRegistrationRequestService
                 "This request is missing a required phone number, department/subject, or profile photo.");
         }
 
+=======
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
         if (!isTeacher && (request.GradeLevelId is null || request.SectionId is null
             || request.Section is null || request.GradeLevel is null))
         {
@@ -478,7 +514,10 @@ public class RegistrationRequestService : IRegistrationRequestService
                     Email = null,
                     GradeLevelId = request.GradeLevelId!.Value,
                     SectionId = request.SectionId!.Value,
+<<<<<<< HEAD
                     GuardianPhone = request.PhoneNumber,
+=======
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
                     PhotoUrl = request.PhotoUrl,
                 },
                 cancellationToken,
@@ -499,8 +538,11 @@ public class RegistrationRequestService : IRegistrationRequestService
                     SchoolId = request.SchoolId,
                     FullName = request.FullName,
                     Email = request.ContactEmail,
+<<<<<<< HEAD
                     PhoneNumber = request.PhoneNumber,
                     Specialization = request.DepartmentSubject,
+=======
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
                     PhotoUrl = request.PhotoUrl,
                 },
                 cancellationToken,

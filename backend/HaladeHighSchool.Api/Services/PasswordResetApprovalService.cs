@@ -42,6 +42,7 @@ public sealed class PasswordResetApprovalService : IPasswordResetApprovalService
     {
         var normalizedEmail = email.Trim();
         var user = await _userManager.FindByEmailAsync(normalizedEmail);
+<<<<<<< HEAD
         var deliveryEmail = normalizedEmail;
         if (user is null)
         {
@@ -66,6 +67,8 @@ public sealed class PasswordResetApprovalService : IPasswordResetApprovalService
             }
         }
 
+=======
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
         if (user is null || !user.IsActive)
         {
             return;
@@ -102,13 +105,18 @@ public sealed class PasswordResetApprovalService : IPasswordResetApprovalService
         _db.PasswordResetRequests.Add(new PasswordResetRequest
         {
             UserId = user.Id,
+<<<<<<< HEAD
             Email = deliveryEmail,
+=======
+            Email = user.Email ?? normalizedEmail,
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
             Role = role,
             RequestDate = now,
             CreatedAt = now,
             Status = PendingStatus,
             IsApproved = false,
         });
+<<<<<<< HEAD
 
         var admins = (await _userManager.GetUsersInRoleAsync(Roles.Admin))
             .Concat(await _userManager.GetUsersInRoleAsync(Roles.SchoolAdmin))
@@ -127,6 +135,8 @@ public sealed class PasswordResetApprovalService : IPasswordResetApprovalService
             });
         }
 
+=======
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
         await _db.SaveChangesAsync(cancellationToken);
     }
 
@@ -220,7 +230,11 @@ public sealed class PasswordResetApprovalService : IPasswordResetApprovalService
         try
         {
             await _emailService.SendPasswordResetApprovedEmailAsync(
+<<<<<<< HEAD
                 approvedRequest.Email,
+=======
+                approvedRequest.User.Email ?? approvedRequest.Email,
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
                 approvedRequest.User.FullName,
                 temporaryPassword,
                 BuildLoginUrl(),

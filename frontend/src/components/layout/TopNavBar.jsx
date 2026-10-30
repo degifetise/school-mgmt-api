@@ -20,8 +20,11 @@ import { useSchoolInfo } from '../../context/SchoolInfoContext';
 import { notificationApi } from '../../services/endpoints';
 import { API_BASE_URL } from '../../services/api';
 import { navItemsFor } from './navigation';
+<<<<<<< HEAD
 import useLogoutConfirmation from '../../hooks/useLogoutConfirmation';
 import LogoutConfirmationModal from '../auth/LogoutConfirmationModal';
+=======
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
 
 const ROLE_STYLE = {
   [ROLES.admin]: { chip: 'bg-amber-400/20 text-amber-100 ring-amber-300/30', Icon: ShieldCheck },
@@ -82,11 +85,18 @@ function IdentityLine({ user, roles }) {
 }
 
 export default function TopNavBar() {
+<<<<<<< HEAD
   const { user, roles, isAuthenticated } = useAuth();
   const { schoolName, academicYear, logoUrl } = useSchoolInfo();
   const location = useLocation();
   const navigate = useNavigate();
   const logoutConfirmation = useLogoutConfirmation();
+=======
+  const { user, roles, isAuthenticated, logout } = useAuth();
+  const { schoolName, academicYear, logoUrl } = useSchoolInfo();
+  const location = useLocation();
+  const navigate = useNavigate();
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -425,7 +435,11 @@ export default function TopNavBar() {
  rather than hiding behind the menu. */}
                   <button
                     type="button"
+<<<<<<< HEAD
                     onClick={logoutConfirmation.requestLogout}
+=======
+                    onClick={() => logout({ silent: false })}
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
                     className="inline-flex items-center gap-2 rounded-lg bg-rose-500/90 px-2.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-rose-500 sm:px-3"
                   >
                     <LogOut className="size-4" aria-hidden="true" />
@@ -487,7 +501,11 @@ export default function TopNavBar() {
                           role="menuitem"
                           onClick={() => {
                             setMenuOpen(false);
+<<<<<<< HEAD
                             logoutConfirmation.requestLogout();
+=======
+                            logout({ silent: false });
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
                           }}
                           className="flex w-full items-center gap-2 px-4 py-3 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-50 "
                         >
@@ -575,7 +593,11 @@ export default function TopNavBar() {
                     type="button"
                     onClick={() => {
                       setMobileOpen(false);
+<<<<<<< HEAD
                       logoutConfirmation.requestLogout();
+=======
+                      logout({ silent: false });
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
                     }}
                     className="flex w-full items-center gap-3 rounded-lg bg-rose-500/15 px-3 py-2.5 text-sm font-semibold text-rose-200 transition-colors hover:bg-rose-500/25"
                   >
@@ -588,12 +610,15 @@ export default function TopNavBar() {
           </motion.div>
         )}
       </AnimatePresence>
+<<<<<<< HEAD
       <LogoutConfirmationModal
         isOpen={logoutConfirmation.isOpen}
         isLoggingOut={logoutConfirmation.isLoggingOut}
         onCancel={logoutConfirmation.cancelLogout}
         onConfirm={logoutConfirmation.confirmLogout}
       />
+=======
+>>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
     </header>
   );
 }
