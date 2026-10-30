@@ -28,11 +28,9 @@ import { ROLES, useAuth } from '../../context/AuthContext';
 import { useSchoolInfo } from '../../context/SchoolInfoContext';
 import { notificationApi } from '../../services/endpoints';
 import { API_BASE_URL } from '../../services/api';
-<<<<<<< HEAD
+
 import useLogoutConfirmation from '../../hooks/useLogoutConfirmation';
 import LogoutConfirmationModal from '../auth/LogoutConfirmationModal';
-=======
->>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
 
 const ADMIN_SECTIONS = [
   {
@@ -136,16 +134,11 @@ export default function SideDashboard({
   mobileOpen,
   onCloseMobile,
 }) {
-<<<<<<< HEAD
   const { user, roles } = useAuth();
   const { schoolName } = useSchoolInfo();
   const navigate = useNavigate();
   const logoutConfirmation = useLogoutConfirmation();
-=======
-  const { user, roles, logout } = useAuth();
-  const { schoolName } = useSchoolInfo();
-  const navigate = useNavigate();
->>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
+
   const width = collapsed ? 'lg:w-20' : 'lg:w-72';
   const primaryRole = [ROLES.superAdmin, ROLES.admin, ROLES.teacher, ROLES.staff, ROLES.student, ROLES.guardian]
     .find((role) => roles.includes(role));
@@ -218,15 +211,10 @@ export default function SideDashboard({
     return () => window.removeEventListener('keydown', closeOnEscape);
   }, [mobileOpen, onCloseMobile]);
 
-<<<<<<< HEAD
+
   function requestLogout() {
     onCloseMobile();
     logoutConfirmation.requestLogout();
-=======
-  async function signOut() {
-    await logout();
-    navigate('/login', { replace: true });
->>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
   }
 
   async function openNotification(notification) {
@@ -423,11 +411,7 @@ export default function SideDashboard({
           <button
             type="button"
             className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-red-50 hover:text-red-700 ${collapsed ? 'lg:w-11 lg:justify-center lg:px-0' : ''}`}
-<<<<<<< HEAD
             onClick={requestLogout}
-=======
-            onClick={signOut}
->>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
             title={collapsed ? 'Sign out' : undefined}
           >
             <LogOut className="size-5 shrink-0" aria-hidden="true" />
@@ -435,15 +419,12 @@ export default function SideDashboard({
           </button>
         </div>
       </aside>
-<<<<<<< HEAD
       <LogoutConfirmationModal
         isOpen={logoutConfirmation.isOpen}
         isLoggingOut={logoutConfirmation.isLoggingOut}
         onCancel={logoutConfirmation.cancelLogout}
         onConfirm={logoutConfirmation.confirmLogout}
       />
-=======
->>>>>>> e397352cf2d5f56e7041bfcb548de595c76a9478
     </>
   );
 }
